@@ -8,6 +8,15 @@ import { EnrollmentsModule } from './enrollments/enrollments.module';
 import { AcademicYearsModule } from './academic-years/academic-years.module';
 import { ClassesModule } from './classes/classes.module';
 import { SectionsModule } from './sections/sections.module';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { AttendanceModule } from './attendance/attendance.module';
+import { TeacherAssignmentsModule } from './teacher-assignments/teacher-assignments.module';
+import { ParentsModule } from './parents/parents.module';
+import { ActivitiesModule } from './activities/activities.module';
+import { DailyLogsModule } from './daily-logs/daily-logs.module';
+import { MessagesModule } from './messages/messages.module';
+import { BulkImportModule } from './bulk-import/bulk-import.module';
 
 @Module({
   imports: [
@@ -33,7 +42,7 @@ import { SectionsModule } from './sections/sections.module';
           password: configService.get<string>('DB_PASSWORD'),
           database: configService.get<string>('DB_NAME'),
           autoLoadEntities: true,
-          synchronize: false,
+          synchronize: true,
         };
       },
     }),
@@ -42,6 +51,15 @@ import { SectionsModule } from './sections/sections.module';
     AcademicYearsModule,
     ClassesModule,
     SectionsModule,
+    AuthModule,
+    UsersModule,
+    AttendanceModule,
+    TeacherAssignmentsModule,
+    ParentsModule,
+    ActivitiesModule,
+    DailyLogsModule,
+    MessagesModule,
+    BulkImportModule,
   ],
   controllers: [AppController],
   providers: [AppService],

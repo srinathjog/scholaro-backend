@@ -3,25 +3,25 @@ import { IsString, IsDateString, IsNotEmpty, IsIn } from 'class-validator';
 export class CreateStudentDto {
   @IsString()
   @IsNotEmpty()
-  first_name: string;
+  first_name!: string;
 
   @IsString()
   @IsNotEmpty()
-  last_name: string;
+  last_name!: string;
 
   @IsDateString()
   @IsNotEmpty()
-  date_of_birth: string;
+  date_of_birth!: string;
 
   @IsString()
   @IsIn(['male', 'female', 'other'])
-  gender: string;
+  gender!: string;
 
   @IsDateString()
   @IsNotEmpty()
-  admission_date: string;
+  admission_date!: string;
 
   @IsString()
   @IsNotEmpty()
-  status: string;
+  status!: string;
 }

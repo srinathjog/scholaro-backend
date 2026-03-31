@@ -6,11 +6,17 @@ import {
   Body,
   Headers,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 
 @Controller('students')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('SCHOOL_ADMIN', 'TEACHER')
 export class StudentsController {
   constructor(private readonly studentsService: StudentsService) {}
 
