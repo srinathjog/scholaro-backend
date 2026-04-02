@@ -3,6 +3,7 @@ import {
   Get,
   Req,
   Param,
+  Query,
   UseGuards,
   BadRequestException,
   Post,
@@ -35,10 +36,19 @@ export class ParentsController {
     return this.parentsService.getMyStudents(user.userId, user.tenantId);
   }
 
+  @Get('me/children')
+  async getMyChildren(@Req() req: Request) {
+    const user = req.user as UserJwt;
+    if (!user?.userId || !user?.tenantId)
+      throw new BadRequestException('Invalid user');
+    return this.parentsService.getMyChildren(user.userId, user.tenantId);
+  }
+
   @Get('student/:studentId/attendance')
   async getStudentAttendance(
     @Req() req: Request,
     @Param('studentId') studentId: string,
+    @Query('date') date?: string,
   ) {
     const user = req.user as UserJwt;
     if (!user?.userId || !user?.tenantId)
@@ -47,6 +57,7 @@ export class ParentsController {
       studentId,
       user.userId,
       user.tenantId,
+      date,
     );
   }
 
@@ -58,6 +69,21 @@ export class ParentsController {
     const user = req.user as UserJwt;
     if (!user?.tenantId) throw new BadRequestException('Invalid user');
     return this.parentsService.linkParentToStudent(dto, user.tenantId);
+  }
+
+  @Get('student/:studentId/fees')
+  async getStudentFees(
+    @Req() req: Request,
+    @Param('studentId') studentId: string,
+  ) {
+    const user = req.user as UserJwt;
+    if (!user?.userId || !user?.tenantId)
+      throw new BadRequestException('Invalid user');
+    return this.parentsService.getStudentFees(
+      studentId,
+      user.userId,
+      user.tenantId,
+    );
   }
 
   @Post()

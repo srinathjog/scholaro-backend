@@ -15,8 +15,12 @@ import { TeacherAssignmentsModule } from './teacher-assignments/teacher-assignme
 import { ParentsModule } from './parents/parents.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { DailyLogsModule } from './daily-logs/daily-logs.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { MessagesModule } from './messages/messages.module';
 import { BulkImportModule } from './bulk-import/bulk-import.module';
+import { FeesModule } from './fees/fees.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { SuperAdminModule } from './super-admin/super-admin.module';
 
 @Module({
   imports: [
@@ -58,8 +62,12 @@ import { BulkImportModule } from './bulk-import/bulk-import.module';
     ParentsModule,
     ActivitiesModule,
     DailyLogsModule,
+    NotificationsModule,
     MessagesModule,
     BulkImportModule,
+    FeesModule,
+    AnalyticsModule,
+    SuperAdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

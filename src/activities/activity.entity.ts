@@ -5,10 +5,12 @@ import {
   CreateDateColumn,
   ManyToOne,
   OneToMany,
+  JoinColumn,
   Index,
 } from 'typeorm';
 import { User } from '../users/user.entity';
 import { ActivityMedia } from './activity-media.entity';
+import { Class } from '../classes/class.entity';
 
 @Entity('activities')
 @Index('idx_activities_tenant_id', ['tenant_id'])
@@ -21,6 +23,10 @@ export class Activity {
 
   @Column({ type: 'uuid', nullable: false })
   class_id!: string;
+
+  @ManyToOne(() => Class, { eager: false })
+  @JoinColumn({ name: 'class_id' })
+  assignedClass!: Class;
 
   @Column({ type: 'uuid', nullable: true })
   section_id!: string | null;

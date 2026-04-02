@@ -7,8 +7,8 @@ export class CreateAttendanceDto {
   @IsDateString()
   date!: string;
 
-  @IsIn(['present', 'absent', 'leave'])
-  status!: 'present' | 'absent' | 'leave';
+  @IsIn(['present', 'absent', 'late', 'leave'])
+  status!: 'present' | 'absent' | 'late' | 'leave';
 
   @IsUUID()
   marked_by!: string;

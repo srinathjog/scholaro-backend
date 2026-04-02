@@ -78,6 +78,7 @@ export class TeacherAssignmentsService {
   async getAssignmentsByTeacher(teacherId: string, tenantId: string) {
     return this.assignmentRepo.find({
       where: { teacher_id: teacherId, tenant_id: tenantId },
+      relations: ['assignedClass', 'section'],
     });
   }
 

@@ -67,4 +67,12 @@ export class EnrollmentsService {
     }
     return enrollment;
   }
+
+  async getEnrollmentsByClass(classId: string, tenantId: string): Promise<Enrollment[]> {
+    return this.enrollmentRepository.find({
+      where: { class_id: classId, tenant_id: tenantId, status: 'active' },
+      relations: ['student'],
+      order: { roll_number: 'ASC' },
+    });
+  }
 }

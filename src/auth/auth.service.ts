@@ -73,19 +73,29 @@ export class AuthService {
 
   async login(loginDto: LoginDto, tenantId: string) {
     const { email, password } = loginDto;
-    // Find user by email and tenant
-    const user = await this.userRepository.findOne({
-      where: { email, tenant_id: tenantId },
-    });
+
+    // SUPER_ADMIN: login without tenant_id
+    let user: User | null = null;
+    if (!tenantId) {
+      user = await this.userRepository.findOne({ where: { email } });
+    } else {
+      user = await this.userRepository.findOne({
+        where: { email, tenant_id: tenantId },
+      });
+    }
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
     // Compare password
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) throw new UnauthorizedException('Invalid credentials');
 
-    // Get all user roles
+    // Get all user roles (for SUPER_ADMIN, query without tenant filter)
+    const whereClause: any = { user_id: user.id };
+    if (tenantId) {
+      whereClause.tenant_id = tenantId;
+    }
     const userRoles = await this.userRoleRepository.find({
-      where: { user_id: user.id, tenant_id: tenantId },
+      where: whereClause,
       relations: ['role'],
     });
     const roleNames = userRoles.map(ur => ur.role?.name).filter(Boolean);
@@ -97,6 +107,6 @@ export class AuthService {
       roles: roleNames, // array of roles
     };
     const token = await this.jwtService.signAsync(payload);
-    return { access_token: token };
+    return { access_token: token, roles: roleNames };
   }
 }

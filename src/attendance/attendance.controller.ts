@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Param,
   Body,
   Query,
@@ -33,10 +34,31 @@ export class AttendanceController {
     return this.attendanceService.markAttendance(dto, tenantId, userId);
   }
 
+  @Post('bulk')
+  async markBulk(
+    @Body() body: { enrollment_ids: string[]; date: string; status: 'present' | 'absent' | 'late' | 'leave' },
+    @Req() req: Request,
+  ) {
+    const { tenantId, userId } = req.user as UserJwt;
+    return this.attendanceService.markBulk(
+      body.enrollment_ids, body.date, body.status, tenantId, userId,
+    );
+  }
+
   @Get()
   async getAttendanceByDate(@Query('date') date: string, @Req() req: Request) {
     const { tenantId } = req.user as UserJwt;
     return this.attendanceService.getAttendanceByDate(date, tenantId);
+  }
+
+  @Get('class/:classId')
+  async getAttendanceByClass(
+    @Param('classId') classId: string,
+    @Query('date') date: string,
+    @Req() req: Request,
+  ) {
+    const { tenantId } = req.user as UserJwt;
+    return this.attendanceService.getAttendanceByClass(classId, date, tenantId);
   }
 
   @Get('student/:enrollmentId')
@@ -48,6 +70,51 @@ export class AttendanceController {
     return this.attendanceService.getAttendanceByStudent(
       enrollmentId,
       tenantId,
+    );
+  }
+
+  @Patch(':id/checkout')
+  async checkoutStudent(
+    @Param('id') id: string,
+    @Body() body: { pickup_by_name: string; pickup_by_photo_url?: string; pickup_notes?: string },
+    @Req() req: Request,
+  ) {
+    const { tenantId, userId } = req.user as UserJwt;
+    return this.attendanceService.secureCheckout(
+      tenantId, id, body, userId,
+    );
+  }
+
+  @Post('bulk-present')
+  async bulkMarkPresent(
+    @Body() body: { enrollment_ids: string[] },
+    @Req() req: Request,
+  ) {
+    const { tenantId, userId } = req.user as UserJwt;
+    return this.attendanceService.bulkMarkPresent(
+      tenantId, body.enrollment_ids, userId,
+    );
+  }
+
+  @Get('report/:classId')
+  async getDailyReport(
+    @Param('classId') classId: string,
+    @Query('date') date: string,
+    @Req() req: Request,
+  ) {
+    const { tenantId } = req.user as UserJwt;
+    const d = date || new Date().toISOString().slice(0, 10);
+    return this.attendanceService.getDailyReport(tenantId, classId, d);
+  }
+
+  @Post('broadcast-arrival')
+  async broadcastArrival(
+    @Body() body: { class_id: string; date: string },
+    @Req() req: Request,
+  ) {
+    const { tenantId } = req.user as UserJwt;
+    return this.attendanceService.broadcastArrival(
+      body.class_id, body.date, tenantId,
     );
   }
 }

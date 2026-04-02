@@ -5,13 +5,13 @@ const axios = require('axios');
 
 const BASE_URL = 'http://localhost:3000';
 const REGISTER_PAYLOAD = {
-  name: 'Admin',
-  email: 'admin@example.com',
-  password: '12345',
+  name: 'admin2@example.com',
+  email: 'admin2@example.com',
+  password: '123456',
 };
 const LOGIN_PAYLOAD = {
-  email: 'admin@example.com',
-  password: '12345',
+  email: 'admin2@example.com',
+  password: '123456',
 };
 
 async function main() {

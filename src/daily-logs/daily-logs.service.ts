@@ -1,24 +1,70 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { DailyLog } from './daily-log.entity';
 import { CreateDailyLogDto } from './dto/create-daily-log.dto';
 import { Enrollment } from '../enrollments/enrollment.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class DailyLogsService {
+  private readonly logger = new Logger(DailyLogsService.name);
+
   constructor(
     @InjectRepository(DailyLog)
     private readonly dailyLogRepo: Repository<DailyLog>,
     @InjectRepository(Enrollment)
     private readonly enrollmentRepo: Repository<Enrollment>,
     private readonly dataSource: DataSource,
+    private readonly notificationsService: NotificationsService,
   ) {}
+
+  private readonly categoryEmoji: Record<string, string> = {
+    meal: '🍲', nap: '😴', potty: '🚽', mood: '😊', health: '💪',
+  };
 
   async create(dto: CreateDailyLogDto): Promise<DailyLog> {
     // Always filter by tenant_id
     const log = this.dailyLogRepo.create({ ...dto });
-    return await this.dailyLogRepo.save(log);
+    const saved = await this.dailyLogRepo.save(log);
+
+    // Fire-and-forget push notification to parents
+    this.sendLogNotification(dto).catch((err) =>
+      this.logger.error(`Push notification failed: ${err.message}`),
+    );
+
+    return saved;
+  }
+
+  private async sendLogNotification(dto: CreateDailyLogDto): Promise<void> {
+    const enrollment = await this.enrollmentRepo.findOne({
+      where: { id: dto.enrollment_id },
+      relations: ['student'],
+    });
+    if (!enrollment?.student) return;
+
+    const name = enrollment.student.first_name;
+    const emoji = this.categoryEmoji[dto.category] || '📝';
+    const value = dto.log_value.replace(/_/g, ' ');
+
+    const sentences: Record<string, Record<string, string>> = {
+      meal: { finished: 'finished the entire meal!', half: 'ate half the meal.', not_eaten: "didn't eat today.", skipped: 'skipped the meal.' },
+      nap: { slept_well: 'slept really well!', '1hr_plus': 'napped for over an hour!', short_nap: 'had a short nap.', no_nap: "didn't nap today.", sleeping: 'is sleeping peacefully.' },
+      mood: { happy: 'is having a great time! 🎉', playful: 'is feeling super playful!', fussy: 'was a little fussy.', quiet: 'was quiet today.', cranky: 'was a bit cranky.' },
+      potty: { dry: 'stayed dry — great job!', normal: 'had a normal potty break.', wet: 'had a wet diaper.', changed: 'was changed.' },
+      health: { fine: 'is feeling healthy!', mild_fever: 'has a mild fever.', sick: 'is feeling under the weather.' },
+    };
+
+    const sentence = sentences[dto.category]?.[dto.log_value] || `— ${value}`;
+
+    await this.notificationsService.notifyParentsOfStudent(
+      enrollment.student_id,
+      dto.tenant_id,
+      {
+        title: `${emoji} ${dto.category.charAt(0).toUpperCase() + dto.category.slice(1)} Update`,
+        body: `${name} ${sentence}`,
+      },
+    );
   }
 
   async findByStudentAndDate(
@@ -40,24 +86,16 @@ export class DailyLogsService {
     tenantId: string,
     classId: string,
     date: string,
-  ): Promise<any[]> {
-    // Complex query: all logs for all students in a class for a given day
+  ): Promise<DailyLog[]> {
     return this.dailyLogRepo
       .createQueryBuilder('log')
-      .innerJoin('log.enrollment', 'enrollment')
+      .innerJoinAndSelect('log.enrollment', 'enrollment')
+      .innerJoinAndSelect('enrollment.student', 'student')
       .where('log.tenant_id = :tenantId', { tenantId })
       .andWhere('enrollment.class_id = :classId', { classId })
       .andWhere('DATE(log.created_at) = :date', { date })
-      .select([
-        'log.id',
-        'log.enrollment_id',
-        'log.category',
-        'log.log_value',
-        'log.notes',
-        'log.logged_by',
-        'log.created_at',
-        'enrollment.student_id',
-      ])
-      .getRawMany();
+      .orderBy('student.first_name', 'ASC')
+      .addOrderBy('log.created_at', 'ASC')
+      .getMany();
   }
 }

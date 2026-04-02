@@ -6,6 +6,7 @@ import { ParentStudent } from './parent-student.entity';
 import { Student } from '../students/student.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { Attendance } from '../attendance/attendance.entity';
+import { Fee } from '../fees/fee.entity';
 import { User } from '../users/user.entity';
 import { UserRole } from '../users/user-role.entity';
 import { Role } from '../users/role.entity';
@@ -17,6 +18,7 @@ import { Role } from '../users/role.entity';
       Student,
       Enrollment,
       Attendance,
+      Fee,
       User,
       UserRole,
       Role,

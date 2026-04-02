@@ -12,6 +12,7 @@ import { Enrollment } from '../enrollments/enrollment.entity';
 
 @Entity('attendance')
 @Unique(['enrollment_id', 'date'])
+@Index(['tenant_id', 'date'])
 export class Attendance {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -31,10 +32,28 @@ export class Attendance {
   date!: string;
 
   @Column({ type: 'varchar', length: 20 })
-  status!: 'present' | 'absent' | 'leave';
+  status!: 'present' | 'absent' | 'late' | 'leave';
 
   @Column('uuid')
   marked_by!: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  check_in_time?: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  check_out_time?: Date;
+
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  pickup_by_name?: string;
+
+  @Column({ type: 'text', nullable: true })
+  pickup_by_photo_url?: string;
+
+  @Column({ type: 'text', nullable: true })
+  pickup_notes?: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  checkout_by?: string;
 
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
