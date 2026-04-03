@@ -14,6 +14,9 @@ import { Class } from '../classes/class.entity';
 import { Section } from '../sections/section.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { AcademicYear } from '../academic-years/academic-year.entity';
+import { ParentStudent } from '../parents/parent-student.entity';
+import { Tenant } from '../super-admin/tenant.entity';
+import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
 import * as ExcelJS from 'exceljs';
 
@@ -36,30 +39,49 @@ export class BulkImportService {
     @InjectRepository(AcademicYear)
     private readonly academicYearRepo: Repository<AcademicYear>,
     private readonly dataSource: DataSource,
+    private readonly mailService: MailService,
   ) {}
 
+  private toNodeBuffer(fileBuffer: Buffer | ArrayBuffer | Uint8Array): Buffer {
+    if (Buffer.isBuffer(fileBuffer)) return fileBuffer;
+    if (fileBuffer instanceof Uint8Array) return Buffer.from(fileBuffer);
+    if (fileBuffer instanceof ArrayBuffer) return Buffer.from(new Uint8Array(fileBuffer));
+    throw new BadRequestException('Invalid file buffer type');
+  }
+
   /**
-   * Import students from Excel file.
-   * Columns: first_name, last_name, dob, gender, class_name, section_name, academic_year
-   * For each row: create class/section if not exist, create student, create enrollment.
-   * Returns: { success: true, imported: N, newClasses: X, newSections: Y }
+   * Complete Family Onboarding — import students from Excel/CSV.
+   * Columns: first_name, last_name, dob, gender, class_name, section_name,
+   *          father_name, father_email, father_phone, mother_name, mother_email
+   *
+   * For each row (inside a transaction):
+   *   1. Create Student
+   *   2. Create Enrollment (auto-detects the active academic year)
+   *   3. Handle Father — find-or-create PARENT user, link via parent_students
+   *   4. Handle Mother — same as father
    */
   async importStudents(
     fileBuffer: Buffer | ArrayBuffer | Uint8Array,
     tenantId: string,
   ) {
     const workbook = new ExcelJS.Workbook();
-    let nodeBuffer;
-    if (Buffer.isBuffer(fileBuffer)) {
-      nodeBuffer = Buffer.from(new Uint8Array(fileBuffer));
-    } else if (fileBuffer instanceof Uint8Array) {
-      nodeBuffer = Buffer.from(fileBuffer);
-    } else if (fileBuffer instanceof ArrayBuffer) {
-      nodeBuffer = Buffer.from(new Uint8Array(fileBuffer));
-    } else {
-      throw new BadRequestException('Invalid file buffer type');
+    const nodeBuffer = this.toNodeBuffer(fileBuffer);
+
+    // Try XLSX first, fall back to CSV
+    try {
+      await workbook.xlsx.load(nodeBuffer as any);
+    } catch {
+      try {
+        const csvContent = nodeBuffer.toString('utf-8');
+        const stream = new (require('stream').Readable)();
+        stream.push(csvContent);
+        stream.push(null);
+        await workbook.csv.read(stream);
+      } catch {
+        throw new BadRequestException('Unable to parse file. Please upload a valid .xlsx or .csv file.');
+      }
     }
-    await workbook.xlsx.load(nodeBuffer);
+
     const worksheet = workbook.worksheets[0];
     if (!worksheet) throw new BadRequestException('No worksheet found');
 
@@ -70,123 +92,300 @@ export class BulkImportService {
       gender: string;
       class_name: string;
       section_name: string;
-      academic_year: string;
+      father_name: string;
+      father_email: string;
+      father_phone: string;
+      mother_name: string;
+      mother_email: string;
+      mother_phone: string;
     };
-    const rows: StudentRow[] = [];
+
+    const cellToString = (val: any): string => {
+      if (val === null || val === undefined) return '';
+      if (val instanceof Date) {
+        return val.toISOString().split('T')[0];
+      }
+      if (typeof val === 'object' && val.text) return String(val.text);
+      if (typeof val === 'object' && val.result !== undefined) return String(val.result);
+      return String(val).trim();
+    };
+
+    /** Parse date string in DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, or MM/DD/YYYY formats */
+    const parseDate = (raw: string): Date => {
+      // Already YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return new Date(raw + 'T00:00:00');
+      // DD/MM/YYYY or DD-MM-YYYY
+      const dmyMatch = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (dmyMatch) {
+        const [, d, m, y] = dmyMatch;
+        return new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T00:00:00`);
+      }
+      // Fallback
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) throw new Error(`Invalid date format: "${raw}". Use DD/MM/YYYY or YYYY-MM-DD.`);
+      return d;
+    };
+
+    const rows: Array<{ data: StudentRow; rowNumber: number }> = [];
+    const preErrors: Array<{ row: number; student: string; error: string }> = [];
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return; // skip header
       const values = Array.isArray(row.values) ? row.values.slice(1) : [];
-      const [
-        first_name,
-        last_name,
-        dob,
-        gender,
-        class_name,
-        section_name,
-        academic_year,
-      ] = values;
-      if (
-        typeof first_name === 'string' &&
-        typeof last_name === 'string' &&
-        typeof dob === 'string' &&
-        typeof gender === 'string' &&
-        typeof class_name === 'string' &&
-        typeof section_name === 'string' &&
-        typeof academic_year === 'string'
-      ) {
-        rows.push({
-          first_name,
-          last_name,
-          dob,
-          gender,
-          class_name,
-          section_name,
-          academic_year,
-        });
+      const first_name = cellToString(values[0]);
+      const last_name = cellToString(values[1]);
+      const dob = cellToString(values[2]);
+      const gender = cellToString(values[3]);
+      const class_name = cellToString(values[4]);
+      const section_name = cellToString(values[5]);
+      // Parent columns (columns 7-12)
+      const father_name = cellToString(values[6]);
+      const father_email = cellToString(values[7]);
+      const father_phone = cellToString(values[8]);
+      const mother_name = cellToString(values[9]);
+      const mother_email = cellToString(values[10]);
+      const mother_phone = cellToString(values[11]);
+
+      const label = `${first_name || '?'} ${last_name || '?'}`;
+
+      // Mandatory student fields
+      const missing: string[] = [];
+      if (!first_name) missing.push('first_name');
+      if (!last_name) missing.push('last_name');
+      if (!dob) missing.push('dob');
+      if (!class_name) missing.push('class_name');
+      if (!section_name) missing.push('section_name');
+      if (missing.length) {
+        preErrors.push({ row: rowNumber, student: label, error: `Missing mandatory fields: ${missing.join(', ')}.` });
+        return;
       }
+
+      // Parent identity: at least one parent must have BOTH email AND phone
+      const fatherComplete = !!(father_email && father_phone);
+      const motherComplete = !!(mother_email && mother_phone);
+      if (!fatherComplete && !motherComplete) {
+        preErrors.push({ row: rowNumber, student: label, error: 'At least one parent email and phone number is required for Scholaro app access.' });
+        return;
+      }
+
+      rows.push({
+        data: {
+          first_name, last_name, dob, gender, class_name, section_name,
+          father_name, father_email, father_phone, mother_name, mother_email, mother_phone,
+        },
+        rowNumber,
+      });
     });
+
+    if (!rows.length && !preErrors.length) {
+      throw new BadRequestException('No valid student rows found in the file.');
+    }
+
+    // If ALL rows failed pre-validation, return early
+    if (!rows.length) {
+      return {
+        success: true,
+        successCount: 0,
+        failureCount: preErrors.length,
+        newClasses: 0,
+        newSections: 0,
+        parentsCreated: 0,
+        parentsLinked: 0,
+        errors: preErrors,
+        message: `All ${preErrors.length} rows failed validation`,
+      };
+    }
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
+
     const createdClasses = new Set<string>();
     const createdSections = new Set<string>();
+    const classCache = new Map<string, Class>();
+    const sectionCache = new Map<string, Section>();
+    const parentUserCache = new Map<string, User>(); // email -> User
     let imported = 0;
+    let skipped = preErrors.length;
+    let parentsCreated = 0;
+    let parentsLinked = 0;
+    const errors: Array<{ row: number; student: string; error: string }> = [...preErrors];
+
     try {
-      for (const row of rows) {
-        // 1. Find or create class
-        let klass = await this.classRepo.findOne({
-          where: { tenant_id: tenantId, name: row.class_name },
-        });
-        if (!klass) {
-          klass = this.classRepo.create({
-            tenant_id: tenantId,
-            name: row.class_name,
-          });
-          klass = await queryRunner.manager.save(klass);
-          createdClasses.add(row.class_name);
-        }
+      // Look up school name for welcome emails
+      const tenant = await queryRunner.manager.findOne(Tenant, {
+        where: { id: tenantId },
+      });
+      const schoolName = tenant?.name || 'Your School';
 
-        // 2. Find or create section
-        let section = await this.sectionRepo.findOne({
-          where: {
-            tenant_id: tenantId,
-            class_id: klass.id,
-            name: row.section_name,
-          },
-        });
-        if (!section) {
-          section = this.sectionRepo.create({
-            tenant_id: tenantId,
-            class_id: klass.id,
-            name: row.section_name,
-          });
-          section = await queryRunner.manager.save(section);
-          createdSections.add(`${row.class_name}-${row.section_name}`);
-        }
+      // Collect welcome emails to send after commit (outside transaction)
+      const welcomeEmails: Array<{ email: string; studentName: string; tempPassword: string }> = [];
 
-        // 3. Find academic year
-        const academicYear = await this.academicYearRepo.findOne({
-          where: { tenant_id: tenantId, year: row.academic_year },
-        });
-        if (!academicYear) {
-          throw new BadRequestException(
-            `Academic year not found: ${row.academic_year}`,
-          );
-        }
+      // Pre-fetch PARENT role
+      const parentRole = await queryRunner.manager.findOne(Role, {
+        where: { name: 'PARENT' },
+      });
 
-        // 4. Create student
-        const student = this.studentRepo.create({
-          tenant_id: tenantId,
-          first_name: row.first_name,
-          last_name: row.last_name,
-          date_of_birth: new Date(row.dob),
-          gender: row.gender,
-          admission_date: new Date(),
-          status: 'active',
-        });
-        const savedStudent = await queryRunner.manager.save(student);
+      // Pre-hash the default parent password once
+      const defaultPasswordHash = await bcrypt.hash('Welcome@Scholaro2026', 10);
 
-        // 5. Create enrollment
-        const enrollment = this.enrollmentRepo.create({
-          tenant_id: tenantId,
-          student_id: savedStudent.id,
-          class_id: klass.id,
-          section_id: section.id,
-          academic_year_id: academicYear.id,
-          roll_number: '', // Can be generated or left blank
-          status: 'active',
-        });
-        await queryRunner.manager.save(enrollment);
-        imported++;
+      // Auto-detect the active academic year for this tenant
+      const activeAcademicYear = await queryRunner.manager.findOne(AcademicYear, {
+        where: { tenant_id: tenantId, is_active: true },
+      });
+      if (!activeAcademicYear) {
+        throw new BadRequestException(
+          'No active academic year found for this tenant. Please create one before importing students.',
+        );
       }
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i].data;
+        const rowNumber = rows[i].rowNumber;
+        const studentLabel = `${row.first_name} ${row.last_name}`;
+
+        // Per-row savepoint — if this row fails, roll back only this row's changes
+        const savepointName = `row_${i}`;
+        await queryRunner.query(`SAVEPOINT ${savepointName}`);
+
+        try {
+
+          // Step 1: Find or create class
+          const classKey = row.class_name;
+          let klass = classCache.get(classKey);
+          if (!klass) {
+            klass = await queryRunner.manager.findOne(Class, {
+              where: { tenant_id: tenantId, name: row.class_name },
+            }) ?? undefined;
+            if (!klass) {
+              klass = this.classRepo.create({
+                tenant_id: tenantId,
+                name: row.class_name,
+              });
+              klass = await queryRunner.manager.save(klass);
+              createdClasses.add(row.class_name);
+            }
+            classCache.set(classKey, klass);
+          }
+
+          // Step 1b: Find or create section
+          const sectionKey = `${klass.id}:${row.section_name}`;
+          let section = sectionCache.get(sectionKey);
+          if (!section) {
+            section = await queryRunner.manager.findOne(Section, {
+              where: {
+                tenant_id: tenantId,
+                class_id: klass.id,
+                name: row.section_name,
+              },
+            }) ?? undefined;
+            if (!section) {
+              section = this.sectionRepo.create({
+                tenant_id: tenantId,
+                class_id: klass.id,
+                name: row.section_name,
+              });
+              section = await queryRunner.manager.save(section);
+              createdSections.add(`${row.class_name}-${row.section_name}`);
+            }
+            sectionCache.set(sectionKey, section);
+          }
+
+          // Step 1c: Create student
+          const student = this.studentRepo.create({
+            tenant_id: tenantId,
+            first_name: row.first_name,
+            last_name: row.last_name,
+            date_of_birth: parseDate(row.dob),
+            gender: row.gender,
+            admission_date: new Date(),
+            status: 'active',
+          });
+          const savedStudent = await queryRunner.manager.save(student);
+
+          // Step 2: Create enrollment (uses auto-detected active academic year)
+          const enrollment = this.enrollmentRepo.create({
+            tenant_id: tenantId,
+            student_id: savedStudent.id,
+            class_id: klass.id,
+            section_id: section.id,
+            academic_year_id: activeAcademicYear.id,
+            roll_number: '',
+            status: 'active',
+          });
+          await queryRunner.manager.save(enrollment);
+
+          // Step 3: Handle Father
+          if (row.father_email && parentRole) {
+            const result = await this.findOrCreateParent(
+              queryRunner, tenantId, row.father_email,
+              row.father_name || `${row.last_name} (Father)`,
+              row.father_phone, defaultPasswordHash, parentRole.id, parentUserCache,
+            );
+            if (result.created) {
+              parentsCreated++;
+              welcomeEmails.push({ email: row.father_email, studentName: studentLabel, tempPassword: 'Welcome@Scholaro2026' });
+            }
+            await this.linkParentIfNew(
+              queryRunner, tenantId, result.user.id, savedStudent.id!, 'father',
+            );
+            parentsLinked++;
+          }
+
+          // Step 4: Handle Mother (same logic as father)
+          if (row.mother_email && parentRole) {
+            const result = await this.findOrCreateParent(
+              queryRunner, tenantId, row.mother_email,
+              row.mother_name || `${row.last_name} (Mother)`,
+              row.mother_phone, defaultPasswordHash, parentRole.id, parentUserCache,
+            );
+            if (result.created) {
+              parentsCreated++;
+              welcomeEmails.push({ email: row.mother_email, studentName: studentLabel, tempPassword: 'Welcome@Scholaro2026' });
+            }
+            await this.linkParentIfNew(
+              queryRunner, tenantId, result.user.id, savedStudent.id!, 'mother',
+            );
+            parentsLinked++;
+          }
+
+          // Row succeeded — release savepoint
+          await queryRunner.query(`RELEASE SAVEPOINT ${savepointName}`);
+          imported++;
+        } catch (rowErr: any) {
+          // Row failed — roll back only this row's changes, continue with next
+          await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          skipped++;
+          errors.push({
+            row: rowNumber,
+            student: studentLabel,
+            error: rowErr.message || 'Unknown error',
+          });
+        }
+      }
+
       await queryRunner.commitTransaction();
+
+      // Send welcome emails after successful commit (fire-and-forget)
+      for (const we of welcomeEmails) {
+        this.mailService.sendWelcomeEmail(we.email, we.studentName, schoolName, we.tempPassword);
+      }
+
+      const failureCount = skipped;
+      const parts = [`Imported ${imported} students`];
+      if (parentsCreated) parts.push(`created ${parentsCreated} parent accounts`);
+      if (parentsLinked) parts.push(`linked ${parentsLinked} parent-student relationships`);
+      if (failureCount) parts.push(`${failureCount} rows failed`);
+
       return {
         success: true,
-        imported,
+        successCount: imported,
+        failureCount,
         newClasses: createdClasses.size,
         newSections: createdSections.size,
-        message: `Successfully imported ${imported} students and created ${createdClasses.size} new classes`,
+        parentsCreated,
+        parentsLinked,
+        errors,
+        message: parts.join(', '),
       };
     } catch (err) {
       await queryRunner.rollbackTransaction();
@@ -201,20 +400,34 @@ export class BulkImportService {
     tenantId: string,
   ) {
     const workbook = new ExcelJS.Workbook();
-    // Always convert input to a Node.js Buffer for exceljs compatibility
-    let nodeBuffer;
-    if (Buffer.isBuffer(fileBuffer)) {
-      nodeBuffer = Buffer.from(new Uint8Array(fileBuffer));
-    } else if (fileBuffer instanceof Uint8Array) {
-      nodeBuffer = Buffer.from(fileBuffer);
-    } else if (fileBuffer instanceof ArrayBuffer) {
-      nodeBuffer = Buffer.from(new Uint8Array(fileBuffer));
-    } else {
-      throw new BadRequestException('Invalid file buffer type');
+    const nodeBuffer = this.toNodeBuffer(fileBuffer);
+
+    // Try XLSX first, fall back to CSV
+    try {
+      await workbook.xlsx.load(nodeBuffer as any);
+    } catch {
+      try {
+        const csvContent = nodeBuffer.toString('utf-8');
+        const stream = new (require('stream').Readable)();
+        stream.push(csvContent);
+        stream.push(null);
+        await workbook.csv.read(stream);
+      } catch {
+        throw new BadRequestException('Unable to parse file. Please upload a valid .xlsx or .csv file.');
+      }
     }
-    await workbook.xlsx.load(nodeBuffer);
+
     const worksheet = workbook.worksheets[0];
     if (!worksheet) throw new BadRequestException('No worksheet found');
+
+    const cellToString = (val: any): string => {
+      if (val === null || val === undefined) return '';
+      if (val instanceof Date) return val.toISOString().split('T')[0];
+      if (typeof val === 'object' && val.text) return String(val.text);
+      if (typeof val === 'object' && val.result !== undefined) return String(val.result);
+      return String(val).trim();
+    };
+
     type TeacherRow = {
       name: string;
       email: string;
@@ -224,25 +437,20 @@ export class BulkImportService {
     };
     const rows: TeacherRow[] = [];
     worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return; // skip header
-      // row.values is [empty, ...columns], so slice(1)
+      if (rowNumber === 1) return;
       const values = Array.isArray(row.values) ? row.values.slice(1) : [];
-      const [name, email, phone, qualification, experience] = values;
-      // Only push if name and email are strings
-      if (typeof name === 'string' && typeof email === 'string') {
+      const name = cellToString(values[0]);
+      const email = cellToString(values[1]);
+      const phone = cellToString(values[2]);
+      const qualification = cellToString(values[3]);
+      const experience = cellToString(values[4]);
+      if (name && email) {
         rows.push({
           name,
           email,
-          phone:
-            typeof phone === 'string' || typeof phone === 'number'
-              ? String(phone)
-              : undefined,
-          qualification:
-            typeof qualification === 'string' ? qualification : undefined,
-          experience:
-            typeof experience === 'string' || typeof experience === 'number'
-              ? String(experience)
-              : undefined,
+          phone: phone || undefined,
+          qualification: qualification || undefined,
+          experience: experience || undefined,
         });
       }
     });
@@ -263,7 +471,7 @@ export class BulkImportService {
           throw new ConflictException(`Duplicate email: ${row.email}`);
         }
         // Create user
-        const password_hash = await bcrypt.hash('Welcome@123', 10);
+        const password_hash = await bcrypt.hash('Welcome@Scholaro2026', 10);
         const user = this.userRepo.create({
           name: row.name,
           email: row.email,
@@ -280,12 +488,10 @@ export class BulkImportService {
         await queryRunner.manager.save(userRole);
         // Create teacher profile
         const teacher = this.teacherRepo.create({
-          user: savedUser,
-          tenantId,
-          firstName: row.name,
-          email: row.email,
-          phone: row.phone,
-          // Add qualification, experience if needed
+          user_id: savedUser.id,
+          tenant_id: tenantId,
+          qualification: row.qualification || null,
+          experience_years: row.experience ? parseInt(row.experience, 10) || null : null,
         });
         await queryRunner.manager.save(teacher);
       }
@@ -297,5 +503,74 @@ export class BulkImportService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /** Find an existing user by email, or create a new PARENT user + role assignment. */
+  private async findOrCreateParent(
+    queryRunner: import('typeorm').QueryRunner,
+    tenantId: string,
+    email: string,
+    name: string,
+    phone: string,
+    passwordHash: string,
+    parentRoleId: number,
+    cache: Map<string, User>,
+  ): Promise<{ user: User; created: boolean }> {
+    const cacheKey = email.toLowerCase();
+    const cached = cache.get(cacheKey);
+    if (cached) return { user: cached, created: false };
+
+    // Global email check — email must be unique across ALL tenants
+    let user = await queryRunner.manager.findOne(User, {
+      where: { email: cacheKey },
+    });
+    if (user) {
+      cache.set(cacheKey, user);
+      return { user, created: false };
+    }
+
+    // Create new parent user
+    user = this.userRepo.create({
+      name,
+      email: cacheKey,
+      password_hash: passwordHash,
+      phone_number: phone || null,
+      is_first_login: true,
+      tenant_id: tenantId,
+    });
+    user = await queryRunner.manager.save(user);
+
+    // Assign PARENT role
+    const userRole = this.userRoleRepo.create({
+      user_id: user.id,
+      role_id: parentRoleId,
+      tenant_id: tenantId,
+    });
+    await queryRunner.manager.save(userRole);
+
+    cache.set(cacheKey, user);
+    return { user, created: true };
+  }
+
+  /** Link a parent to a student if the relationship doesn't already exist. */
+  private async linkParentIfNew(
+    queryRunner: import('typeorm').QueryRunner,
+    tenantId: string,
+    parentUserId: string,
+    studentId: string,
+    relationship: string,
+  ): Promise<void> {
+    const existing = await queryRunner.manager.findOne(ParentStudent, {
+      where: { parent_user_id: parentUserId, student_id: studentId, tenant_id: tenantId },
+    });
+    if (existing) return;
+
+    const link = queryRunner.manager.create(ParentStudent, {
+      tenant_id: tenantId,
+      parent_user_id: parentUserId,
+      student_id: studentId,
+      relationship,
+    });
+    await queryRunner.manager.save(link);
   }
 }

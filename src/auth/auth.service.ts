@@ -2,14 +2,18 @@ import {
   Injectable,
   ConflictException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { UserRole } from '../users/user-role.entity';
 import { Role } from '../users/role.entity';
+import { Tenant } from '../super-admin/tenant.entity';
 import { JwtService } from '@nestjs/jwt';
+import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 
 interface RegisterUserDto {
   name: string;
@@ -31,7 +35,10 @@ export class AuthService {
     private readonly userRoleRepository: Repository<UserRole>,
     @InjectRepository(Role)
     private readonly roleRepository: Repository<Role>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepository: Repository<Tenant>,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
   ) {}
 
   async register(registerDto: RegisterUserDto, tenantId: string) {
@@ -104,9 +111,73 @@ export class AuthService {
     const payload = {
       userId: user.id,
       tenantId: user.tenant_id,
-      roles: roleNames, // array of roles
+      roles: roleNames,
+      isFirstLogin: user.is_first_login,
     };
     const token = await this.jwtService.signAsync(payload);
     return { access_token: token, roles: roleNames };
+  }
+
+  async requestPasswordReset(email: string, tenantId: string) {
+    const user = await this.userRepository.findOne({
+      where: { email, tenant_id: tenantId },
+    });
+    if (!user) {
+      // Return success even if user not found to prevent email enumeration
+      return { message: 'If that email exists, a reset link has been sent.' };
+    }
+
+    // Generate a secure UUID as the reset token
+    const token = crypto.randomUUID();
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    user.reset_password_token = token;
+    user.reset_password_expires = expires;
+    await this.userRepository.save(user);
+
+    // Look up school name for the email
+    const tenant = await this.tenantRepository.findOne({ where: { id: tenantId } });
+    const schoolName = tenant?.name || 'Your School';
+
+    // Fire-and-forget — don't block request on email delivery
+    this.mailService.sendResetPasswordEmail(email, token, schoolName);
+
+    return { message: 'If that email exists, a reset link has been sent.' };
+  }
+
+  async resetPassword(token: string, newPassword: string, tenantId: string) {
+    if (!token || !newPassword) {
+      throw new BadRequestException('Token and new password are required.');
+    }
+
+    // Find the user by plaintext token + tenant
+    const user = await this.userRepository.findOne({
+      where: { reset_password_token: token, tenant_id: tenantId },
+    });
+
+    if (!user || !user.reset_password_expires || user.reset_password_expires < new Date()) {
+      throw new BadRequestException('Invalid or expired reset token.');
+    }
+
+    user.password_hash = await bcrypt.hash(newPassword, 10);
+    user.reset_password_token = null;
+    user.reset_password_expires = null;
+    await this.userRepository.save(user);
+
+    return { message: 'Password has been reset successfully.' };
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found.');
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!isMatch) throw new BadRequestException('Current password is incorrect.');
+
+    user.password_hash = await bcrypt.hash(newPassword, 10);
+    user.is_first_login = false;
+    await this.userRepository.save(user);
+
+    return { message: 'Password changed successfully.' };
   }
 }

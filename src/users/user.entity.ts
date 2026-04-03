@@ -26,8 +26,20 @@ export class User {
   @Column({ type: 'varchar', length: 255 })
   password_hash!: string;
 
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  phone_number!: string | null;
+
   @Column({ type: 'varchar', length: 20, default: 'active' })
   status!: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  reset_password_token!: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  reset_password_expires!: Date | null;
+
+  @Column({ type: 'boolean', default: false })
+  is_first_login!: boolean;
 
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;

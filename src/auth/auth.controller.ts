@@ -1,8 +1,9 @@
-import { Controller, Post, Body, Req } from '@nestjs/common';
+import { Controller, Post, Body, Req, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import express from 'express';
 import { RegisterUserDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -21,5 +22,35 @@ export class AuthController {
   async login(@Body() loginDto: LoginDto, @Req() req: express.Request) {
     const tenantId = req['tenantId'] as string;
     return this.authService.login(loginDto, tenantId);
+  }
+
+  @Post('forgot-password')
+  async forgotPassword(
+    @Body('email') email: string,
+    @Req() req: express.Request,
+  ) {
+    const tenantId = req['tenantId'] as string;
+    return this.authService.requestPasswordReset(email, tenantId);
+  }
+
+  @Post('reset-password')
+  async resetPassword(
+    @Body('token') token: string,
+    @Body('newPassword') newPassword: string,
+    @Req() req: express.Request,
+  ) {
+    const tenantId = req['tenantId'] as string;
+    return this.authService.resetPassword(token, newPassword, tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  async changePassword(
+    @Body('currentPassword') currentPassword: string,
+    @Body('newPassword') newPassword: string,
+    @Req() req: express.Request,
+  ) {
+    const userId = (req as any).user?.userId;
+    return this.authService.changePassword(userId, currentPassword, newPassword);
   }
 }

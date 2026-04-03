@@ -2,6 +2,7 @@ import {
   Injectable,
   ForbiddenException,
   ConflictException,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
@@ -214,5 +215,91 @@ export class ParentsService {
     await this.userRoleRepo.save(userRole);
     // Optionally: create parent profile here
     return savedUser;
+  }
+
+  /** Admin: list all parents with their linked children for a tenant. */
+  async listAllParents(tenantId: string, search?: string) {
+    // Find all users with PARENT role in this tenant
+    const parentRole = await this.roleRepo.findOne({ where: { name: 'PARENT' } });
+    if (!parentRole) return [];
+
+    const qb = this.userRoleRepo.createQueryBuilder('ur')
+      .where('ur.role_id = :roleId', { roleId: parentRole.id })
+      .andWhere('ur.tenant_id = :tenantId', { tenantId });
+    const userRoles = await qb.getMany();
+    if (!userRoles.length) return [];
+
+    const parentUserIds = userRoles.map(ur => ur.user_id);
+
+    // Fetch parent users
+    const parents = await this.userRepo.find({
+      where: parentUserIds.map(id => ({ id, tenant_id: tenantId })),
+    });
+
+    // Fetch all parent-student links for these parents
+    const links = await this.parentStudentRepo.find({
+      where: parentUserIds.map(id => ({ parent_user_id: id, tenant_id: tenantId })),
+    });
+
+    // Fetch all linked students
+    const studentIds = [...new Set(links.map(l => l.student_id))];
+    let studentMap: Record<string, Student> = {};
+    if (studentIds.length) {
+      const students = await this.studentRepo.findByIds(studentIds);
+      studentMap = Object.fromEntries(students.map(s => [s.id, s]));
+    }
+
+    // Build response
+    let result = parents.map(p => {
+      const childLinks = links.filter(l => l.parent_user_id === p.id);
+      const children = childLinks.map(l => {
+        const s = studentMap[l.student_id];
+        return s ? {
+          id: s.id,
+          name: `${s.first_name} ${s.last_name}`,
+          relationship: l.relationship,
+        } : null;
+      }).filter(Boolean);
+      return {
+        id: p.id,
+        name: p.name,
+        email: p.email,
+        status: p.status,
+        created_at: p.created_at,
+        children,
+      };
+    });
+
+    // Client-side search filter (name, email, or child's name)
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.email.toLowerCase().includes(q) ||
+        p.children.some((c: any) => c.name.toLowerCase().includes(q)),
+      );
+    }
+
+    return result;
+  }
+
+  /** Admin: reset a parent's password to the default Welcome@Scholaro2026. */
+  async resetParentPassword(parentUserId: string, tenantId: string) {
+    const user = await this.userRepo.findOne({
+      where: { id: parentUserId, tenant_id: tenantId },
+    });
+    if (!user) throw new NotFoundException('Parent not found');
+
+    // Verify this user actually has the PARENT role
+    const parentRole = await this.roleRepo.findOne({ where: { name: 'PARENT' } });
+    if (!parentRole) throw new NotFoundException('PARENT role not found');
+    const hasRole = await this.userRoleRepo.findOne({
+      where: { user_id: parentUserId, role_id: parentRole.id, tenant_id: tenantId },
+    });
+    if (!hasRole) throw new ForbiddenException('This user is not a parent');
+
+    user.password_hash = await bcrypt.hash('Welcome@Scholaro2026', 10);
+    await this.userRepo.save(user);
+    return { message: 'Password reset to default successfully' };
   }
 }

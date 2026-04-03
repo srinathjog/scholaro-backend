@@ -5,13 +5,13 @@ const axios = require('axios');
 
 const BASE_URL = 'http://localhost:3000';
 const REGISTER_PAYLOAD = {
-  name: 'admin2@example.com',
-  email: 'admin2@example.com',
-  password: '123456',
+  name: 'Prakash Oak',
+  email: 'prakashoak@beginnersacademy.com',
+  password: 'Welcome@2026',
 };
 const LOGIN_PAYLOAD = {
-  email: 'admin2@example.com',
-  password: '123456',
+  email: 'prakashoak@beginnersacademy.com',
+  password: 'Welcome@2026',
 };
 
 async function main() {
@@ -23,17 +23,17 @@ async function main() {
   const headers = { 'x-tenant-id': TENANT_ID };
 
   // Register
-  try {
-    const regRes = await axios.post(`${BASE_URL}/auth/register`, REGISTER_PAYLOAD, { headers });
-    console.log('Register response:', regRes.data);
-  } catch (err) {
-    if (err.response && err.response.status === 409) {
-      console.log('User already registered, continuing to login...');
-    } else {
-      console.error('Register error:', err.response?.data || err.message);
-      process.exit(1);
-    }
-  }
+  // try {
+  //   const regRes = await axios.post(`${BASE_URL}/auth/register`, REGISTER_PAYLOAD, { headers });
+  //   console.log('Register response:', regRes.data);
+  // } catch (err) {
+  //   if (err.response && err.response.status === 409) {
+  //     console.log('User already registered, continuing to login...');
+  //   } else {
+  //     console.error('Register error:', err.response?.data || err.message);
+  //     process.exit(1);
+  //   }
+  // }
 
   // Login
   let token;

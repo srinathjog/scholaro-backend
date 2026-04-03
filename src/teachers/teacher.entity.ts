@@ -1,28 +1,27 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
 import { User } from '../users/user.entity';
 
-@Entity()
+@Entity('teachers')
 export class Teacher {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column('uuid')
+  tenant_id: string;
+
+  @Column('uuid')
+  user_id: string;
+
   @ManyToOne(() => User, { nullable: false })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column({ nullable: false })
-  tenantId: string;
+  @Column({ type: 'varchar', nullable: true })
+  qualification: string | null;
 
-  @Column({ nullable: true })
-  firstName: string;
+  @Column({ type: 'int', nullable: true })
+  experience_years: number | null;
 
-  @Column({ nullable: true })
-  lastName: string;
-
-  @Column({ nullable: true })
-  email: string;
-
-  @Column({ nullable: true })
-  phone: string;
-
-  // Add more fields as needed for teacher profile
+  @CreateDateColumn({ type: 'timestamp', nullable: true })
+  created_at: Date;
 }

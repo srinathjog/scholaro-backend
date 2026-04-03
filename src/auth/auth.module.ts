@@ -8,10 +8,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../users/user.entity';
 import { UserRole } from '../users/user-role.entity';
 import { Role } from '../users/role.entity';
+import { Tenant } from '../super-admin/tenant.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, UserRole, Role]),
+    TypeOrmModule.forFeature([User, UserRole, Role, Tenant]),
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'changeme',

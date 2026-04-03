@@ -13,12 +13,14 @@ import { Class } from '../classes/class.entity';
 import { Section } from '../sections/section.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { AcademicYear } from '../academic-years/academic-year.entity';
+import { ParentStudent } from '../parents/parent-student.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       User, UserRole, Role, Teacher,
-      Student, Class, Section, Enrollment, AcademicYear
+      Student, Class, Section, Enrollment, AcademicYear,
+      ParentStudent,
     ]),
   ],
   controllers: [BulkImportController],

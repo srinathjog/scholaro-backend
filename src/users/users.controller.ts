@@ -1,4 +1,4 @@
-import { Controller, Post, Param, Body, UseGuards, BadRequestException, Req } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, UseGuards, BadRequestException, Req } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -9,6 +9,14 @@ import type { Request } from 'express';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Get('staff')
+  @Roles('SCHOOL_ADMIN', 'SUPER_ADMIN')
+  async getStaff(@Req() req: Request) {
+    const tenantId = (req as any).tenantId || (req.user as any)?.tenantId;
+    if (!tenantId) throw new BadRequestException('Missing tenant');
+    return this.usersService.getStaff(tenantId);
+  }
 
   @Post(':id/roles')
   @Roles('SUPER_ADMIN', 'SCHOOL_ADMIN')

@@ -24,11 +24,51 @@ interface UserJwt {
 
 @Controller('parents')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('PARENT')
 export class ParentsController {
   constructor(private readonly parentsService: ParentsService) {}
 
+  // ── Admin endpoints (SCHOOL_ADMIN) ──
+
+  @Get('admin/list')
+  @Roles('SCHOOL_ADMIN')
+  async listAllParents(
+    @Req() req: Request,
+    @Query('search') search?: string,
+  ) {
+    const user = req.user as UserJwt;
+    if (!user?.tenantId) throw new BadRequestException('Invalid user');
+    return this.parentsService.listAllParents(user.tenantId, search);
+  }
+
+  @Post('admin/:id/reset-password')
+  @Roles('SCHOOL_ADMIN')
+  async resetPassword(
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    const user = req.user as UserJwt;
+    if (!user?.tenantId) throw new BadRequestException('Invalid user');
+    return this.parentsService.resetParentPassword(id, user.tenantId);
+  }
+
+  @Post('admin/create')
+  @Roles('SCHOOL_ADMIN')
+  async adminCreateParent(
+    @Body() body: { name: string; email: string; phone?: string },
+    @Req() req: Request,
+  ) {
+    const user = req.user as UserJwt;
+    if (!user?.tenantId) throw new BadRequestException('Invalid user');
+    return this.parentsService.createParent(
+      { name: body.name, email: body.email, password: 'Welcome@Scholaro2026' },
+      user.tenantId,
+    );
+  }
+
+  // ── Parent endpoints (PARENT) ──
+
   @Get('me/students')
+  @Roles('PARENT')
   async getMyStudents(@Req() req: Request) {
     const user = req.user as UserJwt;
     if (!user?.userId || !user?.tenantId)
@@ -37,6 +77,7 @@ export class ParentsController {
   }
 
   @Get('me/children')
+  @Roles('PARENT')
   async getMyChildren(@Req() req: Request) {
     const user = req.user as UserJwt;
     if (!user?.userId || !user?.tenantId)
@@ -45,6 +86,7 @@ export class ParentsController {
   }
 
   @Get('student/:studentId/attendance')
+  @Roles('PARENT')
   async getStudentAttendance(
     @Req() req: Request,
     @Param('studentId') studentId: string,
@@ -62,6 +104,7 @@ export class ParentsController {
   }
 
   @Post('link')
+  @Roles('PARENT')
   async linkParentToStudent(
     @Body() dto: LinkParentStudentDto,
     @Req() req: Request,
@@ -72,6 +115,7 @@ export class ParentsController {
   }
 
   @Get('student/:studentId/fees')
+  @Roles('PARENT')
   async getStudentFees(
     @Req() req: Request,
     @Param('studentId') studentId: string,
@@ -87,6 +131,7 @@ export class ParentsController {
   }
 
   @Post()
+  @Roles('PARENT')
   async createParent(
     @Body() dto: { name: string; email: string; password: string },
     @Req() req: Request,

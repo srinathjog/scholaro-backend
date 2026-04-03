@@ -75,4 +75,16 @@ export class EnrollmentsService {
       order: { roll_number: 'ASC' },
     });
   }
+
+  async getSectionStudentCounts(tenantId: string): Promise<Array<{ section_id: string; count: number }>> {
+    const result = await this.enrollmentRepository
+      .createQueryBuilder('e')
+      .select('e.section_id', 'section_id')
+      .addSelect('COUNT(*)::int', 'count')
+      .where('e.tenant_id = :tenantId', { tenantId })
+      .andWhere('e.status = :status', { status: 'active' })
+      .groupBy('e.section_id')
+      .getRawMany();
+    return result;
+  }
 }

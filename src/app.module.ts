@@ -21,6 +21,8 @@ import { BulkImportModule } from './bulk-import/bulk-import.module';
 import { FeesModule } from './fees/fees.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
+import { SettingsModule } from './settings/settings.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -68,6 +70,8 @@ import { SuperAdminModule } from './super-admin/super-admin.module';
     FeesModule,
     AnalyticsModule,
     SuperAdminModule,
+    SettingsModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

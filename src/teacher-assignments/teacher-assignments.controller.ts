@@ -3,6 +3,7 @@ import {
   Post,
   Body,
   Get,
+  Delete,
   Param,
   Req,
   UseGuards,
@@ -75,5 +76,38 @@ export class TeacherAssignmentsController {
           : undefined;
     if (!tenantId) throw new BadRequestException('Missing tenantId');
     return this.service.getAssignmentsByClass(classId, tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SCHOOL_ADMIN')
+  @Get()
+  async getAllAssignments(@Req() req: Request & { user: UserJwt }) {
+    const tenantIdRaw = req.user.tenantId || req.headers['x-tenant-id'];
+    const tenantId =
+      typeof tenantIdRaw === 'string'
+        ? tenantIdRaw
+        : Array.isArray(tenantIdRaw)
+          ? tenantIdRaw[0]
+          : undefined;
+    if (!tenantId) throw new BadRequestException('Missing tenantId');
+    return this.service.getAllAssignments(tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SCHOOL_ADMIN')
+  @Delete(':id')
+  async deleteAssignment(
+    @Param('id') id: string,
+    @Req() req: Request & { user: UserJwt },
+  ) {
+    const tenantIdRaw = req.user.tenantId || req.headers['x-tenant-id'];
+    const tenantId =
+      typeof tenantIdRaw === 'string'
+        ? tenantIdRaw
+        : Array.isArray(tenantIdRaw)
+          ? tenantIdRaw[0]
+          : undefined;
+    if (!tenantId) throw new BadRequestException('Missing tenantId');
+    return this.service.deleteAssignment(id, tenantId);
   }
 }

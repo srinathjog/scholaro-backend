@@ -87,4 +87,20 @@ export class TeacherAssignmentsService {
       where: { class_id: classId, tenant_id: tenantId },
     });
   }
+
+  async getAllAssignments(tenantId: string) {
+    return this.assignmentRepo.find({
+      where: { tenant_id: tenantId },
+      relations: ['assignedClass', 'section'],
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async deleteAssignment(id: string, tenantId: string) {
+    const assignment = await this.assignmentRepo.findOne({
+      where: { id, tenant_id: tenantId },
+    });
+    if (!assignment) throw new NotFoundException('Assignment not found');
+    await this.assignmentRepo.remove(assignment);
+  }
 }
