@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AcademicYear } from './academic-year.entity';
@@ -52,5 +52,22 @@ export class AcademicYearsService {
       where: { tenant_id: tenantId, is_active: true },
       order: { start_date: 'DESC' },
     });
+  }
+
+  async setActiveAcademicYear(id: string, tenantId: string): Promise<AcademicYear> {
+    const year = await this.academicYearRepository.findOne({
+      where: { id, tenant_id: tenantId },
+    });
+    if (!year) throw new NotFoundException('Academic year not found');
+
+    // Deactivate all others for this tenant
+    await this.academicYearRepository.update(
+      { tenant_id: tenantId, is_active: true },
+      { is_active: false },
+    );
+
+    // Activate the selected one
+    year.is_active = true;
+    return this.academicYearRepository.save(year);
   }
 }
