@@ -88,12 +88,22 @@ export class NotificationsService {
     }
     if (!subscriptions.length) return;
 
-    // 3. Send to each subscription
+    // 3. Send to each subscription (Angular NGSW format)
     const pushPayload = JSON.stringify({
-      title: payload.title,
-      body: payload.body,
-      icon: payload.icon || '/assets/icons/icon-192.png',
-      url: payload.url || '/parent/timeline',
+      notification: {
+        title: payload.title,
+        body: payload.body,
+        icon: payload.icon || '/icons/icon-192x192.png',
+        vibrate: [100, 50, 100],
+        data: {
+          onActionClick: {
+            default: {
+              operation: 'navigateLastFocusedOrOpen',
+              url: payload.url || '/parent/timeline',
+            },
+          },
+        },
+      },
     });
 
     const staleEndpoints: string[] = [];
@@ -163,10 +173,20 @@ export class NotificationsService {
     if (!subscriptions.length) return;
 
     const pushPayload = JSON.stringify({
-      title: payload.title,
-      body: payload.body,
-      icon: payload.icon || '/assets/icons/icon-192.png',
-      url: payload.url || '/parent/timeline',
+      notification: {
+        title: payload.title,
+        body: payload.body,
+        icon: payload.icon || '/icons/icon-192x192.png',
+        vibrate: [100, 50, 100],
+        data: {
+          onActionClick: {
+            default: {
+              operation: 'navigateLastFocusedOrOpen',
+              url: payload.url || '/parent/timeline',
+            },
+          },
+        },
+      },
     });
 
     const staleEndpoints: string[] = [];
