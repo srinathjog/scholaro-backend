@@ -28,6 +28,9 @@ export class FeeStructure {
   @Column({ type: 'uuid' })
   academic_year_id!: string;
 
+  @Column({ type: 'uuid' })
+  class_id!: string;
+
   @Column({ type: 'varchar', length: 150 })
   name!: string; // e.g. "Term 1 Tuition", "Annual Activity Fee"
 

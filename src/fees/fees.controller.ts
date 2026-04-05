@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -48,6 +49,15 @@ export class FeesController {
   ) {
     const { tenantId } = req.user as UserJwt;
     return this.feesService.getStructures(tenantId, academicYearId);
+  }
+
+  @Delete('structures/:id')
+  async deleteStructure(
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    const { tenantId } = req.user as UserJwt;
+    return this.feesService.deleteStructure(tenantId, id);
   }
 
   // ─── Invoice Generation ────────────────────────────────────────

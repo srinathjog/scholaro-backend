@@ -8,7 +8,11 @@ import { join } from 'path';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.enableCors({
-    origin: 'http://localhost:4200',
+    origin: [
+      'http://localhost:4200',
+      /\.vercel\.app$/,
+      /\.up\.railway\.app$/,
+    ],
     credentials: true,
   });
   app.use(new TenantMiddleware().use);

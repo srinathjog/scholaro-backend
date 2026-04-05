@@ -24,6 +24,7 @@ interface RegisterUserDto {
 interface LoginDto {
   email: string;
   password: string;
+  school_code?: string;
 }
 
 @Injectable()
@@ -79,15 +80,25 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto, tenantId: string) {
-    const { email, password } = loginDto;
+    const { email, password, school_code } = loginDto;
+
+    // Resolve school_code to tenant UUID if provided
+    let resolvedTenantId = tenantId;
+    if (school_code) {
+      const tenant = await this.tenantRepository.findOne({
+        where: { tenant_code: school_code.toUpperCase() },
+      });
+      if (!tenant) throw new UnauthorizedException('Invalid school code');
+      resolvedTenantId = tenant.id;
+    }
 
     // SUPER_ADMIN: login without tenant_id
     let user: User | null = null;
-    if (!tenantId) {
+    if (!resolvedTenantId) {
       user = await this.userRepository.findOne({ where: { email } });
     } else {
       user = await this.userRepository.findOne({
-        where: { email, tenant_id: tenantId },
+        where: { email, tenant_id: resolvedTenantId },
       });
     }
     if (!user) throw new UnauthorizedException('Invalid credentials');
@@ -98,8 +109,8 @@ export class AuthService {
 
     // Get all user roles (for SUPER_ADMIN, query without tenant filter)
     const whereClause: any = { user_id: user.id };
-    if (tenantId) {
-      whereClause.tenant_id = tenantId;
+    if (resolvedTenantId) {
+      whereClause.tenant_id = resolvedTenantId;
     }
     const userRoles = await this.userRoleRepository.find({
       where: whereClause,
@@ -118,9 +129,21 @@ export class AuthService {
     return { access_token: token, roles: roleNames };
   }
 
-  async requestPasswordReset(email: string, tenantId: string) {
+  async requestPasswordReset(email: string, tenantId: string, schoolCode?: string) {
+    // Resolve school_code to tenant UUID if provided
+    let resolvedTenantId = tenantId;
+    if (schoolCode) {
+      const tenant = await this.tenantRepository.findOne({
+        where: { tenant_code: schoolCode.toUpperCase() },
+      });
+      if (!tenant) {
+        return { message: 'If that email exists, a reset link has been sent.' };
+      }
+      resolvedTenantId = tenant.id;
+    }
+
     const user = await this.userRepository.findOne({
-      where: { email, tenant_id: tenantId },
+      where: { email, tenant_id: resolvedTenantId },
     });
     if (!user) {
       // Return success even if user not found to prevent email enumeration
@@ -136,7 +159,7 @@ export class AuthService {
     await this.userRepository.save(user);
 
     // Look up school name for the email
-    const tenant = await this.tenantRepository.findOne({ where: { id: tenantId } });
+    const tenant = await this.tenantRepository.findOne({ where: { id: resolvedTenantId } });
     const schoolName = tenant?.name || 'Your School';
 
     // Fire-and-forget — don't block request on email delivery
@@ -145,14 +168,26 @@ export class AuthService {
     return { message: 'If that email exists, a reset link has been sent.' };
   }
 
-  async resetPassword(token: string, newPassword: string, tenantId: string) {
+  async resetPassword(token: string, newPassword: string, tenantId: string, schoolCode?: string) {
     if (!token || !newPassword) {
       throw new BadRequestException('Token and new password are required.');
     }
 
+    // Resolve school_code to tenant UUID if provided
+    let resolvedTenantId = tenantId;
+    if (schoolCode) {
+      const tenant = await this.tenantRepository.findOne({
+        where: { tenant_code: schoolCode.toUpperCase() },
+      });
+      if (!tenant) {
+        throw new BadRequestException('Invalid or expired reset token.');
+      }
+      resolvedTenantId = tenant.id;
+    }
+
     // Find the user by plaintext token + tenant
     const user = await this.userRepository.findOne({
-      where: { reset_password_token: token, tenant_id: tenantId },
+      where: { reset_password_token: token, tenant_id: resolvedTenantId },
     });
 
     if (!user || !user.reset_password_expires || user.reset_password_expires < new Date()) {

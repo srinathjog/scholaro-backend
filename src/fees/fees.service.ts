@@ -32,13 +32,44 @@ export class FeesService {
   async createStructure(
     dto: CreateFeeStructureDto,
     tenantId: string,
-  ): Promise<FeeStructure> {
+  ): Promise<FeeStructure & { invoices_created: number }> {
     const structure = this.structureRepo.create({
       ...dto,
       amount: parseFloat(dto.amount),
       tenant_id: tenantId,
     });
-    return this.structureRepo.save(structure);
+    const saved = await this.structureRepo.save(structure);
+
+    // Auto-generate fee invoices for all active enrollments in this class
+    const enrollments = await this.enrollmentRepo.find({
+      where: { tenant_id: tenantId, class_id: dto.class_id, status: 'active' },
+    });
+
+    let invoicesCreated = 0;
+    if (enrollments.length > 0) {
+      const fees = enrollments.map((enrollment) => {
+        const totalAmount = Number(saved.amount);
+        return this.feeRepo.create({
+          tenant_id: tenantId,
+          enrollment_id: enrollment.id,
+          fee_structure_id: saved.id,
+          description: saved.name,
+          total_amount: totalAmount,
+          discount_amount: 0,
+          final_amount: totalAmount,
+          paid_amount: 0,
+          due_date: saved.due_date,
+          status: 'pending',
+        });
+      });
+      await this.feeRepo.save(fees);
+      invoicesCreated = fees.length;
+      this.logger.log(
+        `Auto-generated ${invoicesCreated} invoices for structure "${saved.name}" (class ${dto.class_id})`,
+      );
+    }
+
+    return { ...saved, invoices_created: invoicesCreated };
   }
 
   async getStructures(
@@ -48,6 +79,31 @@ export class FeesService {
     const where: any = { tenant_id: tenantId };
     if (academicYearId) where.academic_year_id = academicYearId;
     return this.structureRepo.find({ where, order: { due_date: 'ASC' } });
+  }
+
+  async deleteStructure(
+    tenantId: string,
+    structureId: string,
+  ): Promise<{ deleted: boolean }> {
+    const structure = await this.structureRepo.findOne({
+      where: { id: structureId, tenant_id: tenantId },
+    });
+    if (!structure) {
+      throw new NotFoundException('Fee structure not found.');
+    }
+
+    // Check if any fees reference this structure
+    const feeCount = await this.feeRepo.count({
+      where: { fee_structure_id: structureId, tenant_id: tenantId },
+    });
+    if (feeCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete: ${feeCount} fee invoice(s) reference this structure.`,
+      );
+    }
+
+    await this.structureRepo.remove(structure);
+    return { deleted: true };
   }
 
   // ─── Generate Monthly Invoices ─────────────────────────────────
@@ -80,6 +136,7 @@ export class FeesService {
     const structures = await this.structureRepo
       .createQueryBuilder('fs')
       .where('fs.tenant_id = :tenantId', { tenantId })
+      .andWhere('fs.class_id = :classId', { classId })
       .andWhere('fs.due_date >= :monthStart', { monthStart })
       .andWhere('fs.due_date <= :monthEnd', { monthEnd })
       .getMany();

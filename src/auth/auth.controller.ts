@@ -27,20 +27,22 @@ export class AuthController {
   @Post('forgot-password')
   async forgotPassword(
     @Body('email') email: string,
+    @Body('school_code') schoolCode: string,
     @Req() req: express.Request,
   ) {
     const tenantId = req['tenantId'] as string;
-    return this.authService.requestPasswordReset(email, tenantId);
+    return this.authService.requestPasswordReset(email, tenantId, schoolCode);
   }
 
   @Post('reset-password')
   async resetPassword(
     @Body('token') token: string,
     @Body('newPassword') newPassword: string,
+    @Body('school_code') schoolCode: string,
     @Req() req: express.Request,
   ) {
     const tenantId = req['tenantId'] as string;
-    return this.authService.resetPassword(token, newPassword, tenantId);
+    return this.authService.resetPassword(token, newPassword, tenantId, schoolCode);
   }
 
   @UseGuards(JwtAuthGuard)

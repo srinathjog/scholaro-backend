@@ -12,6 +12,9 @@ export class CreateFeeStructureDto {
   @IsUUID()
   academic_year_id!: string;
 
+  @IsUUID()
+  class_id!: string;
+
   @IsString()
   @MaxLength(150)
   name!: string;

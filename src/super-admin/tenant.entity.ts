@@ -17,6 +17,9 @@ export class Tenant {
   @Column({ type: 'varchar', length: 100, nullable: true })
   subdomain!: string;
 
+  @Column({ type: 'varchar', length: 20, unique: true, nullable: true })
+  tenant_code!: string;
+
   @Column({
     type: 'varchar',
     length: 20,

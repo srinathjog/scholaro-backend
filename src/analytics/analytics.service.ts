@@ -119,8 +119,8 @@ export class AnalyticsService {
 
     const result = await this.dataSource.query(
       `SELECT
-         COALESCE(SUM(amount), 0) as total_due,
-         COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as total_collected,
+         COALESCE(SUM(final_amount), 0) as total_due,
+         COALESCE(SUM(paid_amount), 0) as total_collected,
          COUNT(*) FILTER (WHERE status = 'overdue') as overdue_count
        FROM fees
        WHERE tenant_id = $1

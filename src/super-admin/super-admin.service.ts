@@ -88,6 +88,7 @@ export class SuperAdminService {
          t.id,
          t.name,
          t.subdomain,
+         t.tenant_code,
          t.status,
          t.created_at,
          a.admin_email,
@@ -125,6 +126,16 @@ export class SuperAdminService {
       );
     }
 
+    // Check tenant code uniqueness
+    const existingCode = await this.tenantRepo.findOne({
+      where: { tenant_code: dto.tenantCode.toUpperCase() },
+    });
+    if (existingCode) {
+      throw new ConflictException(
+        `School code "${dto.tenantCode}" is already taken`,
+      );
+    }
+
     const tempPassword = 'Welcome@2026';
 
     return this.dataSource.transaction(async (manager) => {
@@ -132,6 +143,7 @@ export class SuperAdminService {
       const tenant = manager.create('tenants', {
         name: dto.schoolName,
         subdomain: dto.subdomain,
+        tenant_code: dto.tenantCode.toUpperCase(),
         status: 'active',
       });
       const savedTenant = await manager.save('tenants', tenant);
@@ -168,6 +180,7 @@ export class SuperAdminService {
         tenant_id: tenantId,
         school_name: dto.schoolName,
         subdomain: dto.subdomain,
+        tenant_code: dto.tenantCode.toUpperCase(),
         admin_email: dto.adminEmail,
         temporary_password: tempPassword,
       };
