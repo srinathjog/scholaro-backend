@@ -127,12 +127,13 @@ export class SuperAdminService {
     }
 
     // Check tenant code uniqueness
+    const tenantCode = (dto.tenantCode || dto.schoolName.replace(/[^A-Za-z0-9]/g, '').toUpperCase()).slice(0, 20);
     const existingCode = await this.tenantRepo.findOne({
-      where: { tenant_code: dto.tenantCode.toUpperCase() },
+      where: { tenant_code: tenantCode },
     });
     if (existingCode) {
       throw new ConflictException(
-        `School code "${dto.tenantCode}" is already taken`,
+        `School code "${tenantCode}" is already taken`,
       );
     }
 
@@ -143,7 +144,7 @@ export class SuperAdminService {
       const tenant = manager.create('tenants', {
         name: dto.schoolName,
         subdomain: dto.subdomain,
-        tenant_code: dto.tenantCode.toUpperCase(),
+        tenant_code: tenantCode,
         status: 'active',
       });
       const savedTenant = await manager.save('tenants', tenant);
@@ -180,7 +181,7 @@ export class SuperAdminService {
         tenant_id: tenantId,
         school_name: dto.schoolName,
         subdomain: dto.subdomain,
-        tenant_code: dto.tenantCode.toUpperCase(),
+        tenant_code: tenantCode,
         admin_email: dto.adminEmail,
         temporary_password: tempPassword,
       };

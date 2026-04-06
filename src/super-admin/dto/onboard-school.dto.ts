@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MaxLength, Matches } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength, Matches } from 'class-validator';
 
 export class OnboardSchoolDto {
   @IsString()
@@ -14,14 +14,14 @@ export class OnboardSchoolDto {
   })
   subdomain!: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(20)
   @Matches(/^[A-Z0-9]+$/, {
     message:
       'tenantCode must be uppercase alphanumeric only (e.g. HEARTS, SUNSHINE)',
   })
-  tenantCode!: string;
+  tenantCode?: string;
 
   @IsEmail()
   @IsNotEmpty()
