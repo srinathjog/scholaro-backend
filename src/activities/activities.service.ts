@@ -75,6 +75,7 @@ export class ActivitiesService {
       where: { tenant_id: tenantId, class_id: classId },
       relations: ['media', 'assignedClass'],
       order: { created_at: 'DESC' },
+      take: 50,
     });
 
     if (!enrollmentId || activities.length === 0) {

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as webPush from 'web-push';
 import { PushSubscription } from './push-subscription.entity';
@@ -79,13 +79,11 @@ export class NotificationsService {
     if (!parentUserIds.length) return;
 
     // 2. Find all push subscriptions for those parents
-    const subscriptions: PushSubscription[] = [];
-    for (const uid of parentUserIds) {
-      const subs = await this.subscriptionRepo.find({
-        where: { user_id: uid, tenant_id: tenantId },
-      });
-      subscriptions.push(...subs);
-    }
+    const subscriptions = parentUserIds.length
+      ? await this.subscriptionRepo.find({
+          where: { user_id: In(parentUserIds), tenant_id: tenantId },
+        })
+      : [];
     if (!subscriptions.length) return;
 
     // 3. Send to each subscription (Angular NGSW format)
@@ -153,23 +151,18 @@ export class NotificationsService {
     if (!studentIds.length) return;
 
     // Deduplicate parent user IDs across all students in this class
-    const parentUserIdSet = new Set<string>();
-    for (const sid of studentIds) {
-      const links = await this.parentStudentRepo.find({
-        where: { student_id: sid, tenant_id: tenantId },
-      });
-      links.forEach((l) => parentUserIdSet.add(l.parent_user_id));
-    }
-    if (!parentUserIdSet.size) return;
+    const links = studentIds.length
+      ? await this.parentStudentRepo.find({
+          where: { student_id: In(studentIds), tenant_id: tenantId },
+        })
+      : [];
+    const parentUserIds = [...new Set(links.map((l) => l.parent_user_id))];
+    if (!parentUserIds.length) return;
 
     // Gather all subscriptions
-    const subscriptions: PushSubscription[] = [];
-    for (const uid of parentUserIdSet) {
-      const subs = await this.subscriptionRepo.find({
-        where: { user_id: uid, tenant_id: tenantId },
-      });
-      subscriptions.push(...subs);
-    }
+    const subscriptions = await this.subscriptionRepo.find({
+      where: { user_id: In(parentUserIds), tenant_id: tenantId },
+    });
     if (!subscriptions.length) return;
 
     const pushPayload = JSON.stringify({

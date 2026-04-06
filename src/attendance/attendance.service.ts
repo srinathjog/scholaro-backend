@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Attendance } from './attendance.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
@@ -56,16 +56,33 @@ export class AttendanceService {
     tenantId: string,
     userId: string,
   ): Promise<Attendance[]> {
-    const results: Attendance[] = [];
-    for (const enrollmentId of enrollmentIds) {
-      const record = await this.markAttendance(
-        { enrollment_id: enrollmentId, date, status },
-        tenantId,
-        userId,
-      );
-      results.push(record);
-    }
-    return results;
+    if (!enrollmentIds.length) return [];
+
+    const checkInTime = (status === 'present' || status === 'late') ? new Date() : undefined;
+
+    const values = enrollmentIds.map((eid) =>
+      this.attendanceRepository.create({
+        enrollment_id: eid,
+        date,
+        status,
+        tenant_id: tenantId,
+        marked_by: userId,
+        check_in_time: checkInTime,
+      }),
+    );
+
+    // Bulk upsert: insert or update status + marked_by on conflict
+    await this.attendanceRepository
+      .createQueryBuilder()
+      .insert()
+      .values(values)
+      .orUpdate(['status', 'marked_by', 'check_in_time'], ['enrollment_id', 'date', 'tenant_id'])
+      .execute();
+
+    // Return the saved records
+    return this.attendanceRepository.find({
+      where: { date, tenant_id: tenantId, enrollment_id: In(enrollmentIds) },
+    });
   }
 
   async getAttendanceByDate(date: string, tenantId: string) {
@@ -253,20 +270,21 @@ export class AttendanceService {
   ): Promise<{ notified: number }> {
     const records = await this.getAttendanceByClass(classId, date, tenantId);
     const presentRecords = records.filter((r) => r.status === 'present');
+    if (!presentRecords.length) return { notified: 0 };
 
-    let notified = 0;
-    for (const record of presentRecords) {
-      if (record.enrollment?.student) {
-        const name = record.enrollment.student.first_name;
-        await this.notificationsService
-          .notifyParentsOfStudent(record.enrollment.student_id, tenantId, {
-            title: '🏫 Arrived Safely!',
-            body: `${name} has arrived safely at school!`,
-          })
-          .catch((err: any) => this.logger.error(`Arrival push failed: ${err.message}`));
-        notified++;
-      }
-    }
-    return { notified };
+    await Promise.allSettled(
+      presentRecords
+        .filter((r) => r.enrollment?.student)
+        .map((record) => {
+          const name = record.enrollment.student.first_name;
+          return this.notificationsService.notifyParentsOfStudent(
+            record.enrollment.student_id,
+            tenantId,
+            { title: '🏫 Arrived Safely!', body: `${name} has arrived safely at school!` },
+          );
+        }),
+    );
+
+    return { notified: presentRecords.length };
   }
 }
