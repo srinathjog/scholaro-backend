@@ -23,6 +23,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
 import { SettingsModule } from './settings/settings.module';
 import { MailModule } from './mail/mail.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -38,6 +39,14 @@ import { MailModule } from './mail/mail.module';
             url: databaseUrl,
             autoLoadEntities: true,
             synchronize: false,
+            extra: {
+              max: 10,
+              idleTimeoutMillis: 30000,
+              connectionTimeoutMillis: 5000,
+              keepAlive: true,
+            },
+            retryAttempts: 5,
+            retryDelay: 3000,
           };
         }
         return {
@@ -72,6 +81,7 @@ import { MailModule } from './mail/mail.module';
     SuperAdminModule,
     SettingsModule,
     MailModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [AppService],

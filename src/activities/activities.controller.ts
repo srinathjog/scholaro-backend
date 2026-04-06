@@ -14,12 +14,11 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { mkdirSync } from 'fs';
+import { memoryStorage } from 'multer';
 import { ActivitiesService } from './activities.service';
 import { CreateActivityWithMediaDto } from './dto/create-activity-with-media.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { StorageService } from '../storage/storage.service';
 import type { Request } from 'express';
 
 interface AuthRequest extends Request {
@@ -28,23 +27,16 @@ interface AuthRequest extends Request {
 
 @Controller('activities')
 export class ActivitiesController {
-  constructor(private readonly activitiesService: ActivitiesService) {}
+  constructor(
+    private readonly activitiesService: ActivitiesService,
+    private readonly storageService: StorageService,
+  ) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post('upload')
   @UseInterceptors(
     FilesInterceptor('files', 10, {
-      storage: diskStorage({
-        destination: (_req, _file, cb) => {
-          const uploadDir = join(process.cwd(), 'uploads', 'activities');
-          mkdirSync(uploadDir, { recursive: true });
-          cb(null, uploadDir);
-        },
-        filename: (_req, file, cb) => {
-          const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-          const uniqueName = `${Date.now()}_${safeName}`;
-          cb(null, uniqueName);
-        },
-      }),
+      storage: memoryStorage(),
       limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
       fileFilter: (_req, file, cb) => {
         if (!file.mimetype.startsWith('image/')) {
@@ -54,17 +46,22 @@ export class ActivitiesController {
       },
     }),
   )
-  uploadFiles(
+  async uploadFiles(
     @UploadedFiles() files: Express.Multer.File[],
-    @Req() req: Request,
+    @Req() req: AuthRequest,
   ) {
     if (!files || files.length === 0) {
       throw new BadRequestException('No files uploaded');
     }
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const urls = files.map(
-      (f) => `${baseUrl}/uploads/activities/${f.filename}`,
+
+    const tenantId = req.user.tenantId;
+    const urls = await Promise.all(
+      files.map((f) => {
+        const safeName = f.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+        return this.storageService.upload(f.buffer, safeName, f.mimetype, tenantId);
+      }),
     );
+
     return { urls };
   }
 
@@ -83,9 +80,10 @@ export class ActivitiesController {
   @Get('feed')
   async getFeed(
     @Query('class_id') classId: string,
+    @Query('enrollment_id') enrollmentId: string | undefined,
     @Req() req: AuthRequest,
   ) {
-    return this.activitiesService.getFeed(req.user.tenantId, classId);
+    return this.activitiesService.getFeed(req.user.tenantId, classId, enrollmentId);
   }
 
   @UseGuards(JwtAuthGuard)

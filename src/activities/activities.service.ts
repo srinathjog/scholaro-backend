@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { Activity } from './activity.entity';
 import { ActivityMedia } from './activity-media.entity';
+import { Attendance } from '../attendance/attendance.entity';
 import { CreateActivityWithMediaDto } from './dto/create-activity-with-media.dto';
 import { User } from '../users/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -16,6 +17,8 @@ export class ActivitiesService {
     private readonly activityRepo: Repository<Activity>,
     @InjectRepository(ActivityMedia)
     private readonly activityMediaRepo: Repository<ActivityMedia>,
+    @InjectRepository(Attendance)
+    private readonly attendanceRepo: Repository<Attendance>,
     private readonly dataSource: DataSource,
     private readonly notificationsService: NotificationsService,
   ) {}
@@ -55,13 +58,9 @@ export class ActivitiesService {
       return { ...savedActivity, media: mediaRecords };
     });
 
-    // Fire-and-forget push notification to all parents in this class
+    // Fire-and-forget: only push-notify parents of PRESENT students
     if (dto.class_id) {
-      this.notificationsService
-        .notifyParentsOfClass(dto.class_id, dto.tenant_id, {
-          title: '📸 New from class!',
-          body: dto.title || 'New activity posted — check it out!',
-        })
+      this.notifyPresentParents(dto.class_id, dto.tenant_id, dto.title)
         .catch((err: any) =>
           this.logger.error(`Activity push failed: ${err.message}`),
         );
@@ -71,11 +70,47 @@ export class ActivitiesService {
   }
 
   // Helper to get the "WhatsApp Feed" for a specific class
-  async getFeed(tenantId: string, classId: string) {
-    return this.activityRepo.find({
+  async getFeed(tenantId: string, classId: string, enrollmentId?: string) {
+    const activities = await this.activityRepo.find({
       where: { tenant_id: tenantId, class_id: classId },
       relations: ['media', 'assignedClass'],
       order: { created_at: 'DESC' },
+    });
+
+    if (!enrollmentId || activities.length === 0) {
+      return activities;
+    }
+
+    // Collect unique dates from activities (YYYY-MM-DD)
+    const uniqueDates = [
+      ...new Set(
+        activities.map((a) =>
+          new Date(a.created_at).toISOString().slice(0, 10),
+        ),
+      ),
+    ];
+
+    // Bulk-fetch attendance records for this enrollment on those dates
+    const attendanceRecords = await this.attendanceRepo.find({
+      where: {
+        enrollment_id: enrollmentId,
+        tenant_id: tenantId,
+        date: In(uniqueDates),
+      },
+    });
+
+    // Build a date → is_present map
+    const presentDates = new Set<string>();
+    for (const rec of attendanceRecords) {
+      if (rec.status === 'present' || rec.status === 'late') {
+        presentDates.add(rec.date);
+      }
+    }
+
+    // Enrich activities with is_present
+    return activities.map((a) => {
+      const actDate = new Date(a.created_at).toISOString().slice(0, 10);
+      return { ...a, is_present: presentDates.has(actDate) };
     });
   }
 
@@ -92,5 +127,53 @@ export class ActivitiesService {
   async deleteActivity(id: string, tenantId: string) {
     await this.activityMediaRepo.delete({ activity: { id } });
     await this.activityRepo.delete({ id, tenant_id: tenantId });
+  }
+
+  /**
+   * Silent Notification Rule:
+   * Only push-notify parents whose children are marked present/late today.
+   * If attendance hasn't been marked yet, fall back to notifying the entire class.
+   */
+  private async notifyPresentParents(
+    classId: string,
+    tenantId: string,
+    title?: string,
+  ): Promise<void> {
+    const today = new Date().toISOString().slice(0, 10);
+    const payload = {
+      title: '📸 New from class!',
+      body: title || 'New activity posted — check it out!',
+    };
+
+    // Query today's attendance for this class, joined to enrollment for student_id
+    const records = await this.attendanceRepo
+      .createQueryBuilder('att')
+      .innerJoin('att.enrollment', 'enrollment')
+      .where('att.tenant_id = :tenantId', { tenantId })
+      .andWhere('enrollment.class_id = :classId', { classId })
+      .andWhere('att.date = :today', { today })
+      .select(['att.status', 'enrollment.student_id'])
+      .getRawMany();
+
+    // If no attendance marked yet, fall back to notifying all parents in the class
+    if (records.length === 0) {
+      await this.notificationsService.notifyParentsOfClass(classId, tenantId, payload);
+      return;
+    }
+
+    // Only notify parents of present / late students
+    const presentStudentIds = [
+      ...new Set(
+        records
+          .filter((r: any) => r.att_status === 'present' || r.att_status === 'late')
+          .map((r: any) => r.enrollment_student_id),
+      ),
+    ];
+
+    await Promise.allSettled(
+      presentStudentIds.map((studentId) =>
+        this.notificationsService.notifyParentsOfStudent(studentId, tenantId, payload),
+      ),
+    );
   }
 }

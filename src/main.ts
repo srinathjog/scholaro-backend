@@ -12,12 +12,13 @@ async function bootstrap() {
       'http://localhost:4200',
       /\.vercel\.app$/,
       /\.up\.railway\.app$/,
+      /\.netlify\.app$/,
     ],
     credentials: true,
   });
   app.use(new TenantMiddleware().use);
 
-  // Serve uploaded files as static assets
+  // Legacy: serve any old locally-uploaded files (new uploads go to Supabase Storage)
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads/',
   });
