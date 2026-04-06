@@ -10,6 +10,7 @@ import { Fee } from '../fees/fee.entity';
 import { User } from '../users/user.entity';
 import { UserRole } from '../users/user-role.entity';
 import { Role } from '../users/role.entity';
+import { Tenant } from '../super-admin/tenant.entity';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { Role } from '../users/role.entity';
       User,
       UserRole,
       Role,
+      Tenant,
     ]),
   ],
   controllers: [ParentsController],

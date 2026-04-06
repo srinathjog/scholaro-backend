@@ -458,6 +458,15 @@ export class BulkImportService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      // Look up school name & code for welcome emails
+      const tenant = await queryRunner.manager.findOne(Tenant, {
+        where: { id: tenantId },
+      });
+      const schoolName = tenant?.name || 'Your School';
+      const schoolCode = tenant?.tenant_code || '';
+
+      const welcomeEmails: Array<{ email: string; name: string }> = [];
+
       const teacherRole = await this.roleRepo.findOne({
         where: { name: 'TEACHER' },
       });
@@ -494,8 +503,17 @@ export class BulkImportService {
           experience_years: row.experience ? parseInt(row.experience, 10) || null : null,
         });
         await queryRunner.manager.save(teacher);
+        welcomeEmails.push({ email: row.email, name: row.name });
       }
       await queryRunner.commitTransaction();
+
+      // Send welcome emails after successful commit (fire-and-forget)
+      for (const we of welcomeEmails) {
+        this.mailService.sendStaffWelcomeEmail(
+          we.email, we.name, 'Teacher', schoolName, schoolCode, 'Welcome@Scholaro2026',
+        );
+      }
+
       return { success: true, count: rows.length };
     } catch (err) {
       await queryRunner.rollbackTransaction();

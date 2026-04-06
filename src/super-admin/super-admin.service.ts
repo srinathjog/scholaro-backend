@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Tenant } from './tenant.entity';
 import { OnboardSchoolDto } from './dto/onboard-school.dto';
+import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
 
 export interface PlatformStats {
@@ -27,6 +28,7 @@ export class SuperAdminService {
     @InjectRepository(Tenant)
     private readonly tenantRepo: Repository<Tenant>,
     private readonly dataSource: DataSource,
+    private readonly mailService: MailService,
   ) {}
 
   async getPlatformStats(): Promise<PlatformStats> {
@@ -139,7 +141,7 @@ export class SuperAdminService {
 
     const tempPassword = 'Welcome@2026';
 
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       // 1. Create tenant
       const tenant = manager.create('tenants', {
         name: dto.schoolName,
@@ -186,5 +188,12 @@ export class SuperAdminService {
         temporary_password: tempPassword,
       };
     });
+
+    // Send admin welcome email after successful transaction (fire-and-forget)
+    this.mailService.sendStaffWelcomeEmail(
+      dto.adminEmail, dto.adminName, 'School Admin', dto.schoolName, tenantCode, tempPassword,
+    );
+
+    return result;
   }
 }

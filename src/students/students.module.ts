@@ -9,10 +9,11 @@ import { User } from '../users/user.entity';
 import { UserRole } from '../users/user-role.entity';
 import { Role } from '../users/role.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
+import { Tenant } from '../super-admin/tenant.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([
-    Student, ParentStudent, User, UserRole, Role, Enrollment,
+    Student, ParentStudent, User, UserRole, Role, Enrollment, Tenant,
   ])],
   controllers: [StudentsController],
   providers: [StudentsService],

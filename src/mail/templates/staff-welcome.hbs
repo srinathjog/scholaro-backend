@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome to Scholaro</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F3F4F6; font-family: 'Segoe UI', Arial, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #F3F4F6; padding: 24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #FFFFFF; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+
+          <!-- Header Banner -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #4F46E5, #6366F1); padding: 32px 24px; text-align: center;">
+              <h1 style="margin: 0; color: #FFFFFF; font-size: 26px; font-weight: 700; letter-spacing: 0.5px;">
+                Welcome to Scholaro
+              </h1>
+              <p style="margin: 8px 0 0; color: #C7D2FE; font-size: 14px;">
+                {{roleName}} Account Created
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding: 32px 28px;">
+              <p style="margin: 0 0 16px; color: #1F2937; font-size: 16px; line-height: 1.6;">
+                Hi <strong style="color: #4F46E5;">{{name}}</strong>,
+              </p>
+
+              <p style="margin: 0 0 24px; color: #4B5563; font-size: 15px; line-height: 1.6;">
+                Your {{roleName}} account has been created at <strong>{{schoolName}}</strong>.
+                Log in to Scholaro to get started.
+              </p>
+
+              <!-- Credentials Box -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #EEF2FF; border: 1px solid #C7D2FE; border-radius: 10px; margin: 0 0 28px;">
+                <tr>
+                  <td style="padding: 20px 24px;">
+                    <p style="margin: 0 0 4px; color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">
+                      Your Login Credentials
+                    </p>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding: 8px 0; color: #374151; font-size: 15px;">
+                          <strong>School Code:</strong>
+                        </td>
+                        <td style="padding: 8px 0; color: #1F2937; font-size: 15px; font-weight: 700; text-align: right;">
+                          {{schoolCode}}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #374151; font-size: 15px; border-top: 1px solid #DDD6FE;">
+                          <strong>Email:</strong>
+                        </td>
+                        <td style="padding: 8px 0; color: #1F2937; font-size: 15px; text-align: right;">
+                          {{email}}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0; color: #374151; font-size: 15px; border-top: 1px solid #DDD6FE;">
+                          <strong>Temporary Password:</strong>
+                        </td>
+                        <td style="padding: 8px 0; color: #4F46E5; font-size: 15px; font-weight: 700; text-align: right; border-top: 1px solid #DDD6FE; letter-spacing: 1px;">
+                          {{tempPassword}}
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA Button -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding: 0 0 28px;">
+                    <a href="{{loginUrl}}/login"
+                       style="display: inline-block; background: #4F46E5; color: #FFFFFF; padding: 14px 36px;
+                              border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600;
+                              letter-spacing: 0.3px; box-shadow: 0 2px 6px rgba(79,70,229,0.35);">
+                      Log In to Scholaro
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0; color: #9CA3AF; font-size: 13px; line-height: 1.5; text-align: center;">
+                For your security, please change your password after logging in.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #F9FAFB; padding: 20px 28px; border-top: 1px solid #E5E7EB;">
+              <p style="margin: 0; color: #9CA3AF; font-size: 12px; text-align: center; line-height: 1.5;">
+                This is an automated message from the Scholaro Team.<br />
+                If you did not expect this email, please ignore it.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

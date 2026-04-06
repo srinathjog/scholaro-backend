@@ -8,6 +8,8 @@ import { User } from '../users/user.entity';
 import { UserRole } from '../users/user-role.entity';
 import { Role } from '../users/role.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
+import { Tenant } from '../super-admin/tenant.entity';
+import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -25,6 +27,9 @@ export class StudentsService {
     private readonly roleRepo: Repository<Role>,
     @InjectRepository(Enrollment)
     private readonly enrollmentRepo: Repository<Enrollment>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepo: Repository<Tenant>,
+    private readonly mailService: MailService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -194,6 +199,11 @@ export class StudentsService {
         });
         await this.userRoleRepo.save(userRole);
       }
+
+      // Send parent welcome email (fire-and-forget)
+      const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+      const schoolName = tenant?.name || 'Your School';
+      this.mailService.sendWelcomeEmail(dto.email, student.first_name || dto.name, schoolName, 'Welcome@Scholaro2026');
     }
 
     // Link to student

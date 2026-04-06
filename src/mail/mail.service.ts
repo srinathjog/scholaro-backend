@@ -36,6 +36,32 @@ export class MailService {
     }
   }
 
+  async sendStaffWelcomeEmail(
+    email: string,
+    name: string,
+    roleName: string,
+    schoolName: string,
+    schoolCode: string,
+    tempPassword: string,
+  ): Promise<void> {
+    const loginUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:4200';
+
+    const subject = `Welcome to Scholaro — ${roleName} Account at ${schoolName}`;
+
+    try {
+      await this.mailerService.sendMail({
+        to: email,
+        subject,
+        template: 'staff-welcome',
+        context: { email, name, roleName, schoolName, schoolCode, tempPassword, loginUrl },
+      });
+      this.logger.log(`Staff welcome email sent to ${email} (${roleName})`);
+    } catch (err: any) {
+      this.logger.error(`Failed to send staff welcome email to ${email}: ${err.message}`);
+    }
+  }
+
   async sendResetPasswordEmail(
     email: string,
     token: string,

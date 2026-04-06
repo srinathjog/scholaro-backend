@@ -15,6 +15,8 @@ import { Fee } from '../fees/fee.entity';
 import { User } from '../users/user.entity';
 import { UserRole } from '../users/user-role.entity';
 import { Role } from '../users/role.entity';
+import { Tenant } from '../super-admin/tenant.entity';
+import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -36,6 +38,9 @@ export class ParentsService {
     private readonly userRoleRepo: Repository<UserRole>,
     @InjectRepository(Role)
     private readonly roleRepo: Repository<Role>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepo: Repository<Tenant>,
+    private readonly mailService: MailService,
   ) {}
 
   async linkParentToStudent(dto: LinkParentStudentDto, tenantId: string) {
@@ -213,6 +218,10 @@ export class ParentsService {
       tenant_id: tenantId,
     });
     await this.userRoleRepo.save(userRole);
+    // Send parent welcome email (fire-and-forget)
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    const schoolName = tenant?.name || 'Your School';
+    this.mailService.sendWelcomeEmail(dto.email, dto.name, schoolName, dto.password);
     // Optionally: create parent profile here
     return savedUser;
   }
