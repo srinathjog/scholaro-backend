@@ -10,6 +10,7 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:4200',
+      'https://scholaro.app',
       /\.vercel\.app$/,
       /\.up\.railway\.app$/,
       /\.netlify\.app$/,
