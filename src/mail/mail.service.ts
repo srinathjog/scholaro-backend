@@ -32,7 +32,9 @@ export class MailService {
       this.logger.log(`Welcome email sent to ${email}`);
     } catch (err: any) {
       // Log but don't throw — email failure should not block the import
-      this.logger.error(`Failed to send welcome email to ${email}: ${err.message}`);
+      this.logger.error(
+        `Failed to send welcome email to ${email}: ${err.message}`,
+      );
     }
   }
 
@@ -54,11 +56,21 @@ export class MailService {
         to: email,
         subject,
         template: 'staff-welcome',
-        context: { email, name, roleName, schoolName, schoolCode, tempPassword, loginUrl },
+        context: {
+          email,
+          name,
+          roleName,
+          schoolName,
+          schoolCode,
+          tempPassword,
+          loginUrl,
+        },
       });
       this.logger.log(`Staff welcome email sent to ${email} (${roleName})`);
     } catch (err: any) {
-      this.logger.error(`Failed to send staff welcome email to ${email}: ${err.message}`);
+      this.logger.error(
+        `Failed to send staff welcome email to ${email}: ${err.message}`,
+      );
     }
   }
 
@@ -82,7 +94,9 @@ export class MailService {
       });
       this.logger.log(`Reset email sent to ${email}`);
     } catch (err: any) {
-      this.logger.error(`Failed to send reset email to ${email}: ${err.message}`);
+      this.logger.error(
+        `Failed to send reset email to ${email}: ${err.message}`,
+      );
     }
   }
 }

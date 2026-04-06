@@ -72,12 +72,13 @@ export class DailyLogsService {
     enrollmentId: string,
     date: string,
   ): Promise<DailyLog[]> {
-    // date: YYYY-MM-DD
+    // date: YYYY-MM-DD — use range query instead of DATE() to allow index usage
     return this.dailyLogRepo
       .createQueryBuilder('log')
       .where('log.tenant_id = :tenantId', { tenantId })
       .andWhere('log.enrollment_id = :enrollmentId', { enrollmentId })
-      .andWhere('DATE(log.created_at) = :date', { date })
+      .andWhere('log.created_at >= :dateStart', { dateStart: `${date}T00:00:00` })
+      .andWhere('log.created_at < :dateEnd', { dateEnd: this.nextDay(date) })
       .orderBy('log.created_at', 'ASC')
       .getMany();
   }
@@ -93,9 +94,17 @@ export class DailyLogsService {
       .innerJoinAndSelect('enrollment.student', 'student')
       .where('log.tenant_id = :tenantId', { tenantId })
       .andWhere('enrollment.class_id = :classId', { classId })
-      .andWhere('DATE(log.created_at) = :date', { date })
+      .andWhere('log.created_at >= :dateStart', { dateStart: `${date}T00:00:00` })
+      .andWhere('log.created_at < :dateEnd', { dateEnd: this.nextDay(date) })
       .orderBy('student.first_name', 'ASC')
       .addOrderBy('log.created_at', 'ASC')
       .getMany();
+  }
+
+  /** Return YYYY-MM-DDT00:00:00 for the day after the given date string */
+  private nextDay(date: string): string {
+    const d = new Date(date);
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10) + 'T00:00:00';
   }
 }

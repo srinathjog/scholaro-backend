@@ -72,50 +72,48 @@ export class ParentsService {
   }
 
   async getMyChildren(parentUserId: string, tenantId: string) {
-    const links = await this.parentStudentRepo.find({
-      where: { parent_user_id: parentUserId, tenant_id: tenantId },
-    });
-    const studentIds = links.map((l) => l.student_id);
-    if (!studentIds.length) return [];
+    // Single query: parent_students → students → enrollments → classes
+    const rows = await this.parentStudentRepo.manager.query(
+      `SELECT
+         s.id            AS student_id,
+         s.first_name,
+         s.last_name,
+         e.id            AS enrollment_id,
+         e.class_id,
+         e.section_id,
+         e.roll_number,
+         c.name          AS class_name
+       FROM parent_students ps
+       JOIN students s ON s.id = ps.student_id
+       LEFT JOIN enrollments e ON e.student_id = s.id
+         AND e.tenant_id = $2 AND e.status = 'active'
+       LEFT JOIN classes c ON c.id = e.class_id AND c.tenant_id = $2
+       WHERE ps.parent_user_id = $1 AND ps.tenant_id = $2`,
+      [parentUserId, tenantId],
+    );
 
-    // Get students with their active enrollments + class name
-    const students = await this.studentRepo.findByIds(studentIds);
-    const enrollments = await this.enrollmentRepo.find({
-      where: studentIds.map((sid) => ({
-        student_id: sid,
-        tenant_id: tenantId,
-        status: 'active',
-      })),
-      relations: ['student'],
-    });
-
-    // Also fetch class names
-    const classIds = [...new Set(enrollments.map((e) => e.class_id))];
-    let classMap: Record<string, string> = {};
-    if (classIds.length) {
-      const classes = await this.enrollmentRepo.manager
-        .getRepository('classes')
-        .find({ where: classIds.map((id) => ({ id, tenant_id: tenantId })) });
-      classMap = Object.fromEntries(classes.map((c: any) => [c.id, c.name]));
+    // Group rows by student
+    const studentMap = new Map<string, any>();
+    for (const row of rows) {
+      if (!studentMap.has(row.student_id)) {
+        studentMap.set(row.student_id, {
+          id: row.student_id,
+          first_name: row.first_name,
+          last_name: row.last_name,
+          enrollments: [],
+        });
+      }
+      if (row.enrollment_id) {
+        studentMap.get(row.student_id).enrollments.push({
+          id: row.enrollment_id,
+          class_id: row.class_id,
+          section_id: row.section_id,
+          roll_number: row.roll_number,
+          className: row.class_name || null,
+        });
+      }
     }
-
-    return students.map((s) => {
-      const studentEnrollments = enrollments
-        .filter((e) => e.student_id === s.id)
-        .map((e) => ({
-          id: e.id,
-          class_id: e.class_id,
-          section_id: e.section_id,
-          roll_number: e.roll_number,
-          className: classMap[e.class_id] || null,
-        }));
-      return {
-        id: s.id,
-        first_name: s.first_name,
-        last_name: s.last_name,
-        enrollments: studentEnrollments,
-      };
-    });
+    return [...studentMap.values()];
   }
 
   async getStudentAttendance(
