@@ -32,7 +32,7 @@ const { HandlebarsAdapter } = require(
           transport,
           defaults: { from: `"Scholaro" <${from}>` },
           template: {
-            dir: join(__dirname, 'templates'),
+            dir: join(__dirname, '..', '..', 'mail', 'templates'),
             adapter: new HandlebarsAdapter(),
             options: { strict: true },
           },
