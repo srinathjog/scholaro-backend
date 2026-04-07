@@ -21,11 +21,11 @@ const { HandlebarsAdapter } = require(
         const user = config.get<string>('MAIL_USER') || config.get<string>('SMTP_USER');
         const pass = config.get<string>('MAIL_PASSWORD') || config.get<string>('SMTP_PASS');
         const from = config.get<string>('MAIL_FROM') || config.get<string>('SMTP_FROM') || 'noreply@scholaro.app';
-        const port = Number(config.get('SMTP_PORT')) || 587;
+        const port = Number(config.get('SMTP_PORT')) || 465;
 
         const transport =
           host && user && pass
-            ? { host, port, secure: port === 465, auth: { user, pass } }
+            ? { host, port, secure: true, auth: { user, pass } }
             : { jsonTransport: true };
 
         return {
