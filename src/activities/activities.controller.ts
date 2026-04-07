@@ -81,9 +81,13 @@ export class ActivitiesController {
   async getFeed(
     @Query('class_id') classId: string,
     @Query('enrollment_id') enrollmentId: string | undefined,
+    @Query('page') page: string | undefined,
+    @Query('limit') limit: string | undefined,
     @Req() req: AuthRequest,
   ) {
-    return this.activitiesService.getFeed(req.user.tenantId, classId, enrollmentId);
+    const p = Math.max(1, parseInt(page || '1', 10) || 1);
+    const l = Math.min(50, Math.max(1, parseInt(limit || '10', 10) || 10));
+    return this.activitiesService.getFeed(req.user.tenantId, classId, enrollmentId, p, l);
   }
 
   @UseGuards(JwtAuthGuard)

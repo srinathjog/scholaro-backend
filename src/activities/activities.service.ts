@@ -69,17 +69,28 @@ export class ActivitiesService {
     return result;
   }
 
-  // Helper to get the "WhatsApp Feed" for a specific class
-  async getFeed(tenantId: string, classId: string, enrollmentId?: string) {
-    const activities = await this.activityRepo.find({
+  // Helper to get the "WhatsApp Feed" for a specific class (paginated)
+  async getFeed(
+    tenantId: string,
+    classId: string,
+    enrollmentId?: string,
+    page = 1,
+    limit = 10,
+  ) {
+    const skip = (page - 1) * limit;
+
+    const [activities, totalItems] = await this.activityRepo.findAndCount({
       where: { tenant_id: tenantId, class_id: classId },
       relations: ['media', 'assignedClass'],
       order: { created_at: 'DESC' },
-      take: 50,
+      take: limit,
+      skip,
     });
 
+    const hasNextPage = skip + activities.length < totalItems;
+
     if (!enrollmentId || activities.length === 0) {
-      return activities;
+      return { data: activities, meta: { totalItems, hasNextPage, page, limit } };
     }
 
     // Collect unique dates from activities (YYYY-MM-DD)
@@ -109,10 +120,12 @@ export class ActivitiesService {
     }
 
     // Enrich activities with is_present
-    return activities.map((a) => {
+    const data = activities.map((a) => {
       const actDate = new Date(a.created_at).toISOString().slice(0, 10);
       return { ...a, is_present: presentDates.has(actDate) };
     });
+
+    return { data, meta: { totalItems, hasNextPage, page, limit } };
   }
 
   // Get all activities posted by a specific teacher (their portfolio)
