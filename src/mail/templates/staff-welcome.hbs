@@ -3,67 +3,81 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Welcome to Scholaro</title>
+  <title>Your School Portal is Ready — Scholaro</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #F3F4F6; font-family: 'Segoe UI', Arial, sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #F3F4F6; padding: 24px 0;">
+<body style="margin: 0; padding: 0; background-color: #F0F2F5; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #F0F2F5; padding: 32px 0;">
     <tr>
       <td align="center">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #FFFFFF; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
 
-          <!-- Header Banner -->
+          <!-- Header -->
           <tr>
-            <td style="background: linear-gradient(135deg, #4F46E5, #6366F1); padding: 32px 24px; text-align: center;">
-              <h1 style="margin: 0; color: #FFFFFF; font-size: 26px; font-weight: 700; letter-spacing: 0.5px;">
-                Welcome to Scholaro
+            <td style="background: linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #4F46E5 100%); padding: 40px 32px; text-align: center;">
+              <p style="margin: 0 0 8px; font-size: 14px; color: #A5B4FC; letter-spacing: 2px; text-transform: uppercase; font-weight: 600;">
+                Scholaro
+              </p>
+              <h1 style="margin: 0; color: #FFFFFF; font-size: 28px; font-weight: 700; line-height: 1.3;">
+                Your School Portal is Ready
               </h1>
-              <p style="margin: 8px 0 0; color: #C7D2FE; font-size: 14px;">
-                {{roleName}} Account Created
+              <p style="margin: 12px 0 0; color: #C7D2FE; font-size: 15px; line-height: 1.5;">
+                {{roleName}} Account
               </p>
             </td>
           </tr>
 
           <!-- Body -->
           <tr>
-            <td style="padding: 32px 28px;">
-              <p style="margin: 0 0 16px; color: #1F2937; font-size: 16px; line-height: 1.6;">
-                Hi <strong style="color: #4F46E5;">{{name}}</strong>,
+            <td style="padding: 36px 32px 24px;">
+              <p style="margin: 0 0 16px; color: #1F2937; font-size: 17px; line-height: 1.6;">
+                Hi <strong style="color: #312E81;">{{name}}</strong>,
               </p>
 
-              <p style="margin: 0 0 24px; color: #4B5563; font-size: 15px; line-height: 1.6;">
-                Your {{roleName}} account has been created at <strong>{{schoolName}}</strong>.
-                Log in to Scholaro to get started.
+              <p style="margin: 0 0 8px; color: #374151; font-size: 15px; line-height: 1.7;">
+                Congratulations! Your digital portal for <strong style="color: #312E81;">{{schoolName}}</strong>
+                has been successfully created.
               </p>
 
-              <!-- Credentials Box -->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #EEF2FF; border: 1px solid #C7D2FE; border-radius: 10px; margin: 0 0 28px;">
+              <p style="margin: 0 0 28px; color: #6B7280; font-size: 15px; line-height: 1.7;">
+                You can now start onboarding teachers and parents to replace your WhatsApp groups.
+                Everything — attendance, daily logs, photos, fees — in one beautiful app.
+              </p>
+
+              <!-- Credentials Card -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #EEF2FF, #E0E7FF); border: 1px solid #C7D2FE; border-radius: 12px; margin: 0 0 28px;">
                 <tr>
-                  <td style="padding: 20px 24px;">
-                    <p style="margin: 0 0 4px; color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">
-                      Your Login Credentials
+                  <td style="padding: 24px;">
+                    <p style="margin: 0 0 16px; color: #4338CA; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; font-weight: 700;">
+                      Your Login Details
                     </p>
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                       <tr>
-                        <td style="padding: 8px 0; color: #374151; font-size: 15px;">
-                          <strong>School Code:</strong>
+                        <td style="padding: 10px 0; color: #6B7280; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                          School Code
                         </td>
-                        <td style="padding: 8px 0; color: #1F2937; font-size: 15px; font-weight: 700; text-align: right;">
+                        <td style="padding: 10px 0; color: #1E1B4B; font-size: 18px; font-weight: 800; text-align: right; letter-spacing: 2px; font-family: 'Courier New', monospace;">
                           {{schoolCode}}
                         </td>
                       </tr>
                       <tr>
-                        <td style="padding: 8px 0; color: #374151; font-size: 15px; border-top: 1px solid #DDD6FE;">
-                          <strong>Email:</strong>
+                        <td colspan="2" style="border-top: 1px solid #C7D2FE;"></td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0; color: #6B7280; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                          Email
                         </td>
-                        <td style="padding: 8px 0; color: #1F2937; font-size: 15px; text-align: right;">
+                        <td style="padding: 10px 0; color: #1F2937; font-size: 15px; text-align: right;">
                           {{email}}
                         </td>
                       </tr>
                       <tr>
-                        <td style="padding: 8px 0; color: #374151; font-size: 15px; border-top: 1px solid #DDD6FE;">
-                          <strong>Temporary Password:</strong>
+                        <td colspan="2" style="border-top: 1px solid #C7D2FE;"></td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0; color: #6B7280; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                          Temp Password
                         </td>
-                        <td style="padding: 8px 0; color: #4F46E5; font-size: 15px; font-weight: 700; text-align: right; border-top: 1px solid #DDD6FE; letter-spacing: 1px;">
+                        <td style="padding: 10px 0; color: #4F46E5; font-size: 16px; font-weight: 700; text-align: right; letter-spacing: 1.5px; font-family: 'Courier New', monospace;">
                           {{tempPassword}}
                         </td>
                       </tr>
@@ -72,32 +86,37 @@
                 </tr>
               </table>
 
-              <!-- CTA Button -->
+              <!-- Smart Link CTA -->
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td align="center" style="padding: 0 0 28px;">
-                    <a href="{{loginUrl}}/login"
-                       style="display: inline-block; background: #4F46E5; color: #FFFFFF; padding: 14px 36px;
-                              border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 600;
-                              letter-spacing: 0.3px; box-shadow: 0 2px 6px rgba(79,70,229,0.35);">
-                      Log In to Scholaro
+                  <td align="center" style="padding: 0 0 16px;">
+                    <a href="{{loginUrl}}/login?code={{schoolCode}}"
+                       style="display: inline-block; background: linear-gradient(135deg, #4F46E5, #6366F1); color: #FFFFFF; padding: 16px 48px;
+                              border-radius: 10px; text-decoration: none; font-size: 16px; font-weight: 700;
+                              letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(79,70,229,0.4);">
+                      Open Your School Portal →
                     </a>
                   </td>
                 </tr>
               </table>
 
-              <p style="margin: 0; color: #9CA3AF; font-size: 13px; line-height: 1.5; text-align: center;">
-                For your security, please change your password after logging in.
+              <p style="margin: 0 0 4px; color: #9CA3AF; font-size: 12px; text-align: center;">
+                This link auto-fills your school code — just enter email &amp; password.
+              </p>
+              <p style="margin: 0; color: #D1D5DB; font-size: 12px; text-align: center;">
+                Please change your password after first login.
               </p>
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
-            <td style="background-color: #F9FAFB; padding: 20px 28px; border-top: 1px solid #E5E7EB;">
-              <p style="margin: 0; color: #9CA3AF; font-size: 12px; text-align: center; line-height: 1.5;">
-                This is an automated message from the Scholaro Team.<br />
-                If you did not expect this email, please ignore it.
+            <td style="background-color: #F9FAFB; padding: 24px 32px; border-top: 1px solid #E5E7EB;">
+              <p style="margin: 0 0 4px; color: #9CA3AF; font-size: 12px; text-align: center; line-height: 1.5;">
+                Scholaro — The modern preschool management platform
+              </p>
+              <p style="margin: 0; color: #D1D5DB; font-size: 11px; text-align: center;">
+                This is an automated email. If you didn't request this, please ignore it.
               </p>
             </td>
           </tr>

@@ -91,7 +91,7 @@ export class NotificationsService {
       notification: {
         title: payload.title,
         body: payload.body,
-        icon: payload.icon || '/icons/icon-192x192.png',
+        icon: payload.icon || '/icons/scholaro-192.png',
         vibrate: [100, 50, 100],
         data: {
           onActionClick: {
@@ -113,12 +113,14 @@ export class NotificationsService {
             { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
             pushPayload,
           );
+          this.logger.log(`Push sent to ${sub.endpoint.slice(0, 50)}...`);
         } catch (err: any) {
           if (err.statusCode === 404 || err.statusCode === 410) {
             // Subscription expired — mark for cleanup
             staleEndpoints.push(sub.endpoint);
+            this.logger.warn(`Stale subscription (${err.statusCode}): ${sub.endpoint.slice(0, 50)}`);
           } else {
-            this.logger.error(`Push failed for ${sub.endpoint}: ${err.message}`);
+            this.logger.error(`Push failed (${err.statusCode}): ${err.message}`);
           }
         }
       }),
@@ -169,7 +171,7 @@ export class NotificationsService {
       notification: {
         title: payload.title,
         body: payload.body,
-        icon: payload.icon || '/icons/icon-192x192.png',
+        icon: payload.icon || '/icons/scholaro-192.png',
         vibrate: [100, 50, 100],
         data: {
           onActionClick: {
@@ -190,11 +192,13 @@ export class NotificationsService {
             { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
             pushPayload,
           );
+          this.logger.log(`Class push sent to ${sub.endpoint.slice(0, 50)}...`);
         } catch (err: any) {
           if (err.statusCode === 404 || err.statusCode === 410) {
             staleEndpoints.push(sub.endpoint);
+            this.logger.warn(`Stale subscription (${err.statusCode}): ${sub.endpoint.slice(0, 50)}`);
           } else {
-            this.logger.error(`Push failed for ${sub.endpoint}: ${err.message}`);
+            this.logger.error(`Class push failed (${err.statusCode}): ${err.message}`);
           }
         }
       }),
@@ -205,5 +209,57 @@ export class NotificationsService {
         await this.subscriptionRepo.delete({ endpoint });
       }
     }
+  }
+
+  /**
+   * Test push: send a test notification to a specific user.
+   * Used for debugging push delivery.
+   */
+  async testPush(userId: string, tenantId: string): Promise<{ sent: number; failed: number; stale: number }> {
+    const subs = await this.subscriptionRepo.find({
+      where: { user_id: userId, tenant_id: tenantId },
+    });
+
+    if (!subs.length) {
+      this.logger.warn(`No push subscriptions found for user ${userId}`);
+      return { sent: 0, failed: 0, stale: 0 };
+    }
+
+    const payload = JSON.stringify({
+      notification: {
+        title: '🔔 Scholaro Test',
+        body: 'Push notifications are working! You will receive activity updates here.',
+        icon: '/icons/scholaro-192.png',
+        vibrate: [100, 50, 100],
+        data: {
+          onActionClick: {
+            default: { operation: 'navigateLastFocusedOrOpen', url: '/parent/timeline' },
+          },
+        },
+      },
+    });
+
+    let sent = 0, failed = 0, stale = 0;
+    for (const sub of subs) {
+      try {
+        await webPush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          payload,
+        );
+        sent++;
+        this.logger.log(`Test push delivered: ${sub.endpoint.slice(0, 50)}`);
+      } catch (err: any) {
+        if (err.statusCode === 404 || err.statusCode === 410) {
+          stale++;
+          await this.subscriptionRepo.delete({ endpoint: sub.endpoint });
+          this.logger.warn(`Cleaned stale subscription: ${sub.endpoint.slice(0, 50)}`);
+        } else {
+          failed++;
+          this.logger.error(`Test push failed (${err.statusCode}): ${err.message}`);
+        }
+      }
+    }
+
+    return { sent, failed, stale };
   }
 }

@@ -24,6 +24,11 @@ async function bootstrap() {
     prefix: '/uploads/',
   });
 
+  // Serve public assets (PWA logos, etc.)
+  app.useStaticAssets(join(process.cwd(), 'public', 'assets'), {
+    prefix: '/assets/',
+  });
+
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

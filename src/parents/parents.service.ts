@@ -219,7 +219,7 @@ export class ParentsService {
     // Send parent welcome email (fire-and-forget)
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     const schoolName = tenant?.name || 'Your School';
-    this.mailService.sendWelcomeEmail(dto.email, dto.name, schoolName, dto.password);
+    this.mailService.sendWelcomeEmail(dto.email, dto.name, schoolName, dto.password, tenant?.tenant_code);
     // Optionally: create parent profile here
     return savedUser;
   }

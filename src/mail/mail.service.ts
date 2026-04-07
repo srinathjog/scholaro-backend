@@ -58,14 +58,15 @@ export class MailService {
     studentName: string,
     schoolName: string,
     tempPassword: string,
+    schoolCode?: string,
   ): Promise<void> {
     const loginUrl =
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:4200';
 
-    const subject = `Welcome to Scholaro! Access ${studentName}'s Daily Updates at ${schoolName}`;
+    const subject = `${studentName}'s school ${schoolName} is now on Scholaro! 🎉`;
 
     try {
-      const html = this.renderTemplate('welcome', { email, studentName, schoolName, tempPassword, loginUrl });
+      const html = this.renderTemplate('welcome', { email, studentName, schoolName, tempPassword, loginUrl, schoolCode: schoolCode || '' });
       await this.send(email, subject, html);
       this.logger.log(`Welcome email sent to ${email}`);
     } catch (err: any) {
@@ -86,7 +87,9 @@ export class MailService {
     const loginUrl =
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:4200';
 
-    const subject = `Welcome to Scholaro — ${roleName} Account at ${schoolName}`;
+    const subject = roleName === 'School Admin'
+      ? `Your School ${schoolName} is now live on Scholaro! 🚀`
+      : `Welcome to ${schoolName} on Scholaro — ${roleName} Account`;
 
     try {
       const html = this.renderTemplate('staff-welcome', { email, name, roleName, schoolName, schoolCode, tempPassword, loginUrl });

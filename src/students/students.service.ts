@@ -203,7 +203,7 @@ export class StudentsService {
       // Send parent welcome email (fire-and-forget)
       const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
       const schoolName = tenant?.name || 'Your School';
-      this.mailService.sendWelcomeEmail(dto.email, student.first_name || dto.name, schoolName, 'Welcome@Scholaro2026');
+      this.mailService.sendWelcomeEmail(dto.email, student.first_name || dto.name, schoolName, 'Welcome@Scholaro2026', tenant?.tenant_code);
     }
 
     // Link to student

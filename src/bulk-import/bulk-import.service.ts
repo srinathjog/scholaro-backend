@@ -216,6 +216,7 @@ export class BulkImportService {
         where: { id: tenantId },
       });
       const schoolName = tenant?.name || 'Your School';
+      const schoolCode = tenant?.tenant_code || '';
 
       // Collect welcome emails to send after commit (outside transaction)
       const welcomeEmails: Array<{ email: string; studentName: string; tempPassword: string }> = [];
@@ -367,7 +368,7 @@ export class BulkImportService {
 
       // Send welcome emails after successful commit (fire-and-forget)
       for (const we of welcomeEmails) {
-        this.mailService.sendWelcomeEmail(we.email, we.studentName, schoolName, we.tempPassword);
+        this.mailService.sendWelcomeEmail(we.email, we.studentName, schoolName, we.tempPassword, schoolCode);
       }
 
       const failureCount = skipped;

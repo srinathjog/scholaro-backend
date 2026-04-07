@@ -30,4 +30,13 @@ export class NotificationsController {
     await this.notificationsService.unsubscribe(userId, tenantId, body.endpoint);
     return { unsubscribed: true };
   }
+
+  /** Send a test push to the current user — for debugging */
+  @UseGuards(JwtAuthGuard)
+  @Post('test-push')
+  async testPush(@Req() req: any) {
+    const { userId, tenantId } = req.user;
+    const result = await this.notificationsService.testPush(userId, tenantId);
+    return result;
+  }
 }
