@@ -76,7 +76,7 @@ export class AttendanceService {
       .createQueryBuilder()
       .insert()
       .values(values)
-      .orUpdate(['status', 'marked_by', 'check_in_time'], ['enrollment_id', 'date', 'tenant_id'])
+      .orUpdate(['status', 'marked_by', 'check_in_time'], ['enrollment_id', 'date'])
       .execute();
 
     // Return the saved records

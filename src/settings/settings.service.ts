@@ -28,14 +28,31 @@ export class SettingsService {
 
     // Auto-create default row if none exists
     if (!settings) {
-      settings = this.repo.create({
-        tenant_id: tenantId,
-        primary_color: '#3B82F6',
-        secondary_color: '#10B981',
-        contact_phone: '',
-      });
-      settings = await this.repo.save(settings);
-      this.logger.log(`Created default settings for tenant ${tenantId}`);
+      try {
+        settings = this.repo.create({
+          tenant_id: tenantId,
+          primary_color: '#3B82F6',
+          secondary_color: '#10B981',
+          contact_phone: '',
+        });
+        settings = await this.repo.save(settings);
+        this.logger.log(`Created default settings for tenant ${tenantId}`);
+      } catch {
+        // FK violation or other DB error — return defaults without persisting
+        this.logger.warn(`Could not auto-create settings for tenant ${tenantId}, returning defaults`);
+        const defaults = {
+          id: '',
+          tenant_id: tenantId,
+          logo_url: null,
+          primary_color: '#3B82F6',
+          secondary_color: '#10B981',
+          school_motto: null,
+          contact_phone: '',
+          updated_at: new Date(),
+        };
+        this.cache.set(tenantId, { data: defaults, expiresAt: Date.now() + this.TTL_MS });
+        return defaults;
+      }
     }
 
     const data = {
