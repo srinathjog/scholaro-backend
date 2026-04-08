@@ -62,6 +62,35 @@ export class NotificationsService {
     return this.configService.get<string>('VAPID_PUBLIC_KEY') || '';
   }
 
+  /** Build a standardized push notification payload with badge, renotify, tag */
+  private buildPushPayload(payload: {
+    title: string;
+    body: string;
+    icon?: string;
+    url?: string;
+    tag?: string;
+  }): string {
+    return JSON.stringify({
+      notification: {
+        title: payload.title,
+        body: payload.body,
+        icon: payload.icon || '/icons/scholaro-192.png',
+        badge: '/icons/scholaro-192.png',
+        vibrate: [100, 50, 100],
+        tag: payload.tag || 'scholaro-update',
+        renotify: true,
+        data: {
+          onActionClick: {
+            default: {
+              operation: 'navigateLastFocusedOrOpen',
+              url: payload.url || '/parent/timeline',
+            },
+          },
+        },
+      },
+    });
+  }
+
   /**
    * Send a push notification to all parents of a given student.
    * Called from DailyLogsService / ActivitiesService after saving.
@@ -87,22 +116,7 @@ export class NotificationsService {
     if (!subscriptions.length) return;
 
     // 3. Send to each subscription (Angular NGSW format)
-    const pushPayload = JSON.stringify({
-      notification: {
-        title: payload.title,
-        body: payload.body,
-        icon: payload.icon || '/icons/scholaro-192.png',
-        vibrate: [100, 50, 100],
-        data: {
-          onActionClick: {
-            default: {
-              operation: 'navigateLastFocusedOrOpen',
-              url: payload.url || '/parent/timeline',
-            },
-          },
-        },
-      },
-    });
+    const pushPayload = this.buildPushPayload(payload);
 
     const staleEndpoints: string[] = [];
 
@@ -167,22 +181,7 @@ export class NotificationsService {
     });
     if (!subscriptions.length) return;
 
-    const pushPayload = JSON.stringify({
-      notification: {
-        title: payload.title,
-        body: payload.body,
-        icon: payload.icon || '/icons/scholaro-192.png',
-        vibrate: [100, 50, 100],
-        data: {
-          onActionClick: {
-            default: {
-              operation: 'navigateLastFocusedOrOpen',
-              url: payload.url || '/parent/timeline',
-            },
-          },
-        },
-      },
-    });
+    const pushPayload = this.buildPushPayload(payload);
 
     const staleEndpoints: string[] = [];
     await Promise.allSettled(
@@ -225,18 +224,9 @@ export class NotificationsService {
       return { sent: 0, failed: 0, stale: 0 };
     }
 
-    const payload = JSON.stringify({
-      notification: {
-        title: '🔔 Scholaro Test',
-        body: 'Push notifications are working! You will receive activity updates here.',
-        icon: '/icons/scholaro-192.png',
-        vibrate: [100, 50, 100],
-        data: {
-          onActionClick: {
-            default: { operation: 'navigateLastFocusedOrOpen', url: '/parent/timeline' },
-          },
-        },
-      },
+    const payload = this.buildPushPayload({
+      title: '🔔 Scholaro Test',
+      body: 'Push notifications are working! You will receive activity updates here.',
     });
 
     let sent = 0, failed = 0, stale = 0;

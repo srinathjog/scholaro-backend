@@ -147,6 +147,7 @@ export class ActivitiesService {
    * Silent Notification Rule:
    * Only push-notify parents whose children are marked present/late today.
    * If attendance hasn't been marked yet, fall back to notifying the entire class.
+   * Personalized: each parent gets their child's name in the notification.
    */
   private async notifyPresentParents(
     classId: string,
@@ -154,39 +155,53 @@ export class ActivitiesService {
     title?: string,
   ): Promise<void> {
     const today = new Date().toISOString().slice(0, 10);
-    const payload = {
-      title: '📸 New from class!',
-      body: title || 'New activity posted — check it out!',
-    };
 
-    // Query today's attendance for this class, joined to enrollment for student_id
+    // Query today's attendance for this class, joined to enrollment + student for name
     const records = await this.attendanceRepo
       .createQueryBuilder('att')
       .innerJoin('att.enrollment', 'enrollment')
+      .innerJoin('enrollment.student', 'student')
       .where('att.tenant_id = :tenantId', { tenantId })
       .andWhere('enrollment.class_id = :classId', { classId })
       .andWhere('att.date = :today', { today })
-      .select(['att.status', 'enrollment.student_id'])
+      .select([
+        'att.status',
+        'enrollment.student_id',
+        'student.first_name',
+      ])
       .getRawMany();
 
     // If no attendance marked yet, fall back to notifying all parents in the class
     if (records.length === 0) {
-      await this.notificationsService.notifyParentsOfClass(classId, tenantId, payload);
+      await this.notificationsService.notifyParentsOfClass(classId, tenantId, {
+        title: '📸 New from class!',
+        body: title || 'New activity posted — check it out!',
+      });
       return;
     }
 
-    // Only notify parents of present / late students
-    const presentStudentIds = [
-      ...new Set(
-        records
-          .filter((r: any) => r.att_status === 'present' || r.att_status === 'late')
-          .map((r: any) => r.enrollment_student_id),
-      ),
-    ];
+    // Only notify parents of present / late students — personalized per child
+    const presentStudents = records
+      .filter((r: any) => r.att_status === 'present' || r.att_status === 'late')
+      .map((r: any) => ({
+        studentId: r.enrollment_student_id,
+        firstName: r.student_first_name,
+      }));
+
+    // Deduplicate by studentId
+    const seen = new Set<string>();
+    const unique = presentStudents.filter((s) => {
+      if (seen.has(s.studentId)) return false;
+      seen.add(s.studentId);
+      return true;
+    });
 
     await Promise.allSettled(
-      presentStudentIds.map((studentId) =>
-        this.notificationsService.notifyParentsOfStudent(studentId, tenantId, payload),
+      unique.map((s) =>
+        this.notificationsService.notifyParentsOfStudent(s.studentId, tenantId, {
+          title: `📸 New photo of ${s.firstName} in class!`,
+          body: title || 'Check out the latest activity update!',
+        }),
       ),
     );
   }
