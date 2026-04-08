@@ -24,21 +24,21 @@ export class AcademicYearsController {
   @Post()
   @Roles('SCHOOL_ADMIN')
   async create(@Body() dto: CreateAcademicYearDto, @Req() req: Request) {
-    const tenantId = req['tenantId'] as string;
+    const tenantId = (req['tenantId'] as string) || (req as any).user?.tenantId;
     if (!tenantId) throw new BadRequestException('Missing tenantId');
     return this.academicYearsService.createAcademicYear(dto, tenantId);
   }
 
   @Get()
   async findAll(@Req() req: Request) {
-    const tenantId = req['tenantId'] as string;
+    const tenantId = (req['tenantId'] as string) || (req as any).user?.tenantId;
     if (!tenantId) throw new BadRequestException('Missing tenantId');
     return this.academicYearsService.getAllAcademicYears(tenantId);
   }
 
   @Get('active')
   async getActive(@Req() req: Request) {
-    const tenantId = req['tenantId'] as string;
+    const tenantId = (req['tenantId'] as string) || (req as any).user?.tenantId;
     if (!tenantId) throw new BadRequestException('Missing tenantId');
     return this.academicYearsService.getActiveAcademicYear(tenantId);
   }
@@ -46,7 +46,7 @@ export class AcademicYearsController {
   @Patch(':id/set-active')
   @Roles('SCHOOL_ADMIN')
   async setActive(@Param('id') id: string, @Req() req: Request) {
-    const tenantId = req['tenantId'] as string;
+    const tenantId = (req['tenantId'] as string) || (req as any).user?.tenantId;
     if (!tenantId) throw new BadRequestException('Missing tenantId');
     return this.academicYearsService.setActiveAcademicYear(id, tenantId);
   }

@@ -1,7 +1,7 @@
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { TenantMiddleware } from './tenant.middleware';
+import { TenantMiddleware, TenantFallbackInterceptor } from './tenant.middleware';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { json, urlencoded } from 'express';
@@ -24,6 +24,7 @@ async function bootstrap() {
     credentials: true,
   });
   app.use(new TenantMiddleware().use);
+  app.useGlobalInterceptors(new TenantFallbackInterceptor());
 
   // Legacy: serve any old locally-uploaded files (new uploads go to Supabase Storage)
   app.useStaticAssets(join(process.cwd(), 'uploads'), {

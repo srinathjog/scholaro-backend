@@ -9,3 +9,22 @@ export class TenantMiddleware implements NestMiddleware {
     next();
   }
 }
+
+/**
+ * Global guard-level hook: after JWT auth sets req.user,
+ * backfill req['tenantId'] from the JWT if the header was missing.
+ * Use as a NestJS interceptor so it runs after guards.
+ */
+import { CallHandler, ExecutionContext, NestInterceptor } from '@nestjs/common';
+import { Observable } from 'rxjs';
+
+@Injectable()
+export class TenantFallbackInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    const req = context.switchToHttp().getRequest();
+    if (!req['tenantId'] && req.user?.tenantId) {
+      req['tenantId'] = req.user.tenantId;
+    }
+    return next.handle();
+  }
+}

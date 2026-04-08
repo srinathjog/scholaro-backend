@@ -17,14 +17,14 @@ export class SectionsController {
 
   @Post()
   async create(@Body() dto: CreateSectionDto, @Req() req: Request) {
-    const tenantId = req['tenantId'] as string;
+    const tenantId = (req['tenantId'] as string) || (req as any).user?.tenantId;
     if (!tenantId) throw new BadRequestException('Missing tenantId');
     return this.sectionsService.createSection(dto, tenantId);
   }
 
   @Get()
   async findAll(@Query('classId') classId: string, @Req() req: Request) {
-    const tenantId = req['tenantId'] as string;
+    const tenantId = (req['tenantId'] as string) || (req as any).user?.tenantId;
     if (!tenantId) throw new BadRequestException('Missing tenantId');
     if (!classId) throw new BadRequestException('Missing classId');
     return this.sectionsService.getSectionsByClass(classId, tenantId);

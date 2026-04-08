@@ -20,7 +20,7 @@ export class EnrollmentsController {
     @Body() createEnrollmentDto: CreateEnrollmentDto,
     @Req() req: Request,
   ) {
-    const tenantId = req['tenantId'] as string | undefined;
+    const tenantId = (req['tenantId'] as string) || (req as any).user?.tenantId;
     if (!tenantId) {
       throw new BadRequestException('Missing tenantId in request');
     }
@@ -32,7 +32,7 @@ export class EnrollmentsController {
 
   @Get()
   async getAllEnrollments(@Req() req: Request) {
-    const tenantId = req['tenantId'] as string | undefined;
+    const tenantId = (req['tenantId'] as string) || (req as any).user?.tenantId;
     if (!tenantId) {
       throw new BadRequestException('Missing tenantId in request');
     }
@@ -44,7 +44,7 @@ export class EnrollmentsController {
     @Param('classId') classId: string,
     @Req() req: Request,
   ) {
-    const tenantId = req['tenantId'] as string | undefined;
+    const tenantId = (req['tenantId'] as string) || (req as any).user?.tenantId;
     if (!tenantId) {
       throw new BadRequestException('Missing tenantId in request');
     }
@@ -53,7 +53,7 @@ export class EnrollmentsController {
 
   @Get('section-counts')
   async getSectionStudentCounts(@Req() req: Request) {
-    const tenantId = req['tenantId'] as string | undefined;
+    const tenantId = (req['tenantId'] as string) || (req as any).user?.tenantId;
     if (!tenantId) {
       throw new BadRequestException('Missing tenantId in request');
     }
@@ -62,7 +62,7 @@ export class EnrollmentsController {
 
   @Get(':id')
   async getEnrollmentById(@Param('id') id: string, @Req() req: Request) {
-    const tenantId = req['tenantId'] as string | undefined;
+    const tenantId = (req['tenantId'] as string) || (req as any).user?.tenantId;
     if (!tenantId) {
       throw new BadRequestException('Missing tenantId in request');
     }
