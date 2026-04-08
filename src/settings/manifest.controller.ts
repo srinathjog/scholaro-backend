@@ -16,6 +16,26 @@ export class ManifestController {
     private readonly settingsRepo: Repository<TenantSettings>,
   ) {}
 
+  @Get('info/:code')
+  async getInfo(@Param('code') code: string) {
+    const tenant = await this.tenantRepo.findOne({
+      where: { tenant_code: code.toUpperCase() },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`School not found for code: ${code}`);
+    }
+
+    const settings = await this.settingsRepo.findOne({
+      where: { tenant_id: tenant.id },
+    });
+
+    return {
+      name: tenant.name,
+      logo_url: settings?.logo_url || null,
+    };
+  }
+
   @Get('manifest/:code')
   @Header('Content-Type', 'application/manifest+json')
   async getManifest(@Param('code') code: string) {
