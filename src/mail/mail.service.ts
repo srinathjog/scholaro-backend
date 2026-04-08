@@ -61,7 +61,7 @@ export class MailService {
     schoolCode?: string,
   ): Promise<void> {
     const loginUrl =
-      this.configService.get<string>('FRONTEND_URL');
+      this.configService.get<string>('FRONTEND_URL') || 'https://scholaro.app';
 
     const subject = `${studentName}'s school ${schoolName} is now on Scholaro! 🎉`;
 
@@ -85,7 +85,7 @@ export class MailService {
     tempPassword: string,
   ): Promise<void> {
     const loginUrl =
-      this.configService.get<string>('FRONTEND_URL');
+      this.configService.get<string>('FRONTEND_URL') || 'https://scholaro.app';
 
     const subject = roleName === 'School Admin'
       ? `Your School ${schoolName} is now live on Scholaro! 🚀`
@@ -108,7 +108,7 @@ export class MailService {
     schoolName: string,
   ): Promise<void> {
     const frontendUrl =
-      this.configService.get<string>('FRONTEND_URL');
+      this.configService.get<string>('FRONTEND_URL') || 'https://scholaro.app';
     const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
 
     const subject = `Password Reset — ${schoolName}`;
