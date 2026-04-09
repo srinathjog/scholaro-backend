@@ -22,6 +22,7 @@ async function bootstrap() {
       /\.netlify\.app$/,
     ],
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
   });
   app.use(new TenantMiddleware().use);
   app.useGlobalInterceptors(new TenantFallbackInterceptor());

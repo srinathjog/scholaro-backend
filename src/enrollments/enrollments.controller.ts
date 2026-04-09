@@ -6,12 +6,15 @@ import {
   Body,
   Req,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { EnrollmentsService } from './enrollments.service';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { Request } from 'express';
 
 @Controller('enrollments')
+@UseGuards(JwtAuthGuard)
 export class EnrollmentsController {
   constructor(private readonly enrollmentsService: EnrollmentsService) {}
 

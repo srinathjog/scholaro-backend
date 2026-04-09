@@ -6,12 +6,15 @@ import {
   Req,
   Query,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { SectionsService } from './sections.service';
 import { CreateSectionDto } from './dto/create-section.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { Request } from 'express';
 
 @Controller('sections')
+@UseGuards(JwtAuthGuard)
 export class SectionsController {
   constructor(private readonly sectionsService: SectionsService) {}
 

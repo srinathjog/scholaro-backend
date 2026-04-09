@@ -5,12 +5,15 @@ import {
   Body,
   Req,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { ClassesService } from './classes.service';
 import { CreateClassDto } from './dto/create-class.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { Request } from 'express';
 
 @Controller('classes')
+@UseGuards(JwtAuthGuard)
 export class ClassesController {
   constructor(private readonly classesService: ClassesService) {}
 
