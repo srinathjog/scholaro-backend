@@ -126,7 +126,15 @@ export class AuthService {
       isFirstLogin: user.is_first_login,
     };
     const token = await this.jwtService.signAsync(payload);
-    return { access_token: token, roles: roleNames };
+
+    // Resolve tenant name for branding
+    let tenantName = '';
+    if (user.tenant_id) {
+      const t = await this.tenantRepository.findOne({ where: { id: user.tenant_id } });
+      if (t) tenantName = t.name;
+    }
+
+    return { access_token: token, roles: roleNames, tenant_name: tenantName };
   }
 
   async requestPasswordReset(email: string, tenantId: string, schoolCode?: string) {
