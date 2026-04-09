@@ -18,6 +18,18 @@ export class AttendanceService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  async checkToday(classId: string, tenantId: string): Promise<{ isMarked: boolean }> {
+    const today = new Date().toISOString().slice(0, 10);
+    const count = await this.attendanceRepository
+      .createQueryBuilder('att')
+      .innerJoin('att.enrollment', 'enrollment')
+      .where('att.tenant_id = :tenantId', { tenantId })
+      .andWhere('enrollment.class_id = :classId', { classId })
+      .andWhere('att.date = :today', { today })
+      .getCount();
+    return { isMarked: count > 0 };
+  }
+
   async markAttendance(
     dto: MarkAttendanceDto,
     tenantId: string,

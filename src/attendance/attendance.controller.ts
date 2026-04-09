@@ -96,6 +96,15 @@ export class AttendanceController {
     );
   }
 
+  @Get('check-today/:classId')
+  async checkToday(
+    @Param('classId') classId: string,
+    @Req() req: Request,
+  ) {
+    const { tenantId } = req.user as UserJwt;
+    return this.attendanceService.checkToday(classId, tenantId);
+  }
+
   @Get('report/:classId')
   async getDailyReport(
     @Param('classId') classId: string,
