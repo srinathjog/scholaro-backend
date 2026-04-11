@@ -5,6 +5,7 @@ import { Roles } from '../auth/roles.decorator';
 import { SuperAdminService } from './super-admin.service';
 import { OnboardSchoolDto } from './dto/onboard-school.dto';
 import { UpdateTenantStatusDto } from './dto/update-tenant-status.dto';
+import { ResetAdminPasswordDto } from './dto/reset-admin-password.dto';
 
 @Controller('super-admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -35,5 +36,13 @@ export class SuperAdminController {
     @Body(new ValidationPipe({ whitelist: true })) dto: UpdateTenantStatusDto,
   ) {
     return this.superAdminService.updateTenantStatus(id, dto.status);
+  }
+
+  @Patch('tenants/:id/reset-admin-password')
+  async resetAdminPassword(
+    @Param('id') tenantId: string,
+    @Body(new ValidationPipe({ whitelist: true })) dto: ResetAdminPasswordDto,
+  ) {
+    return this.superAdminService.resetAdminPassword(tenantId, dto.newPassword);
   }
 }

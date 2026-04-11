@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Tenant } from './tenant.entity';
@@ -115,6 +115,42 @@ export class SuperAdminService {
     }
     tenant.status = status;
     return this.tenantRepo.save(tenant);
+  }
+
+  async resetAdminPassword(tenantId: string, newPassword: string) {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) {
+      throw new NotFoundException(`Tenant ${tenantId} not found`);
+    }
+
+    // Find the SCHOOL_ADMIN user for this tenant
+    const admins = await this.dataSource.query(
+      `SELECT u.id, u.email, u.name
+       FROM users u
+       JOIN user_roles ur ON ur.user_id = u.id AND ur.tenant_id = $1
+       JOIN roles r ON r.id = ur.role_id AND r.name = 'SCHOOL_ADMIN'
+       WHERE u.tenant_id = $1
+       LIMIT 1`,
+      [tenantId],
+    );
+
+    if (!admins || admins.length === 0) {
+      throw new BadRequestException('No SCHOOL_ADMIN user found for this tenant');
+    }
+
+    const admin = admins[0];
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await this.dataSource.query(
+      `UPDATE users SET password_hash = $1 WHERE id = $2 AND tenant_id = $3`,
+      [passwordHash, admin.id, tenantId],
+    );
+
+    return {
+      message: 'Admin password reset successfully',
+      admin_email: admin.email,
+      admin_name: admin.name,
+    };
   }
 
   async onboardNewSchool(dto: OnboardSchoolDto) {
