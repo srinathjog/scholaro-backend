@@ -366,10 +366,14 @@ export class BulkImportService {
 
       await queryRunner.commitTransaction();
 
-      // Send welcome emails after successful commit (fire-and-forget)
-      for (const we of welcomeEmails) {
-        this.mailService.sendWelcomeEmail(we.email, we.studentName, schoolName, we.tempPassword, schoolCode);
-      }
+      // Send welcome emails after successful commit (rate-limited, fire-and-forget)
+      const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+      (async () => {
+        for (const we of welcomeEmails) {
+          this.mailService.sendWelcomeEmail(we.email, we.studentName, schoolName, we.tempPassword, schoolCode);
+          await delay(600); // ~1.6 emails/sec to stay under Resend's 2/sec limit
+        }
+      })();
 
       const failureCount = skipped;
       const parts = [`Imported ${imported} students`];
