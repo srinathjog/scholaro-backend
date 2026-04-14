@@ -35,7 +35,7 @@ export class FeesService {
   ): Promise<FeeStructure & { invoices_created: number }> {
     const structure = this.structureRepo.create({
       ...dto,
-      amount: parseFloat(dto.amount),
+      amount: dto.amount,
       tenant_id: tenantId,
     });
     const saved = await this.structureRepo.save(structure);
@@ -220,8 +220,8 @@ export class FeesService {
     tenantId: string,
     userId: string,
   ): Promise<Fee> {
-    const total = parseFloat(dto.total_amount);
-    const discount = dto.discount_amount ? parseFloat(dto.discount_amount) : 0;
+    const total = dto.total_amount;
+    const discount = dto.discount_amount ?? 0;
     const final_amount = total - discount;
 
     if (final_amount < 0) {
@@ -272,7 +272,7 @@ export class FeesService {
       throw new BadRequestException('This fee has already been fully paid.');
     }
 
-    const paymentAmount = parseFloat(dto.amount);
+    const paymentAmount = dto.amount;
     if (paymentAmount <= 0) {
       throw new BadRequestException('Payment amount must be greater than zero.');
     }

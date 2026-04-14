@@ -1,11 +1,12 @@
 import {
   IsUUID,
   IsDateString,
-  IsDecimal,
+  IsNumber,
   IsOptional,
   IsString,
   MaxLength,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateFeeDto {
   @IsUUID()
@@ -19,12 +20,14 @@ export class CreateFeeDto {
   @MaxLength(150)
   description!: string;
 
-  @IsDecimal({ decimal_digits: '0,2' })
-  total_amount!: string;
+  @IsNumber()
+  @Type(() => Number)
+  total_amount!: number;
 
   @IsOptional()
-  @IsDecimal({ decimal_digits: '0,2' })
-  discount_amount?: string;
+  @IsNumber()
+  @Type(() => Number)
+  discount_amount?: number;
 
   @IsOptional()
   @IsString()

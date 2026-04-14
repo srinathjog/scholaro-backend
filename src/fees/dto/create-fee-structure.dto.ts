@@ -1,12 +1,13 @@
 import {
   IsUUID,
   IsDateString,
-  IsDecimal,
+  IsNumber,
   IsIn,
   IsOptional,
   IsString,
   MaxLength,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateFeeStructureDto {
   @IsUUID()
@@ -23,8 +24,9 @@ export class CreateFeeStructureDto {
   @IsString()
   description?: string;
 
-  @IsDecimal({ decimal_digits: '0,2' })
-  amount!: string; // received as string from JSON, parsed in service
+  @IsNumber()
+  @Type(() => Number)
+  amount!: number;
 
   @IsDateString()
   due_date!: string;

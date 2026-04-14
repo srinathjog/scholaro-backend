@@ -1,8 +1,10 @@
-import { IsDecimal, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class RecordPaymentDto {
-  @IsDecimal({ decimal_digits: '0,2' })
-  amount!: string;
+  @IsNumber()
+  @Type(() => Number)
+  amount!: number;
 
   @IsOptional()
   @IsString()
