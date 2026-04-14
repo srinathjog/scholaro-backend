@@ -28,6 +28,6 @@ export class PushSubscription {
   @Column({ type: 'varchar', length: 500 })
   auth!: string;
 
-  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
 }

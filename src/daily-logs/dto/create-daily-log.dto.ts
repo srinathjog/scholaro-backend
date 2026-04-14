@@ -1,8 +1,9 @@
 import { IsUUID, IsString, IsOptional, IsIn } from 'class-validator';
 
 export class CreateDailyLogDto {
+  @IsOptional()
   @IsUUID()
-  tenant_id!: string;
+  tenant_id?: string;
 
   @IsUUID()
   enrollment_id!: string;
@@ -18,6 +19,7 @@ export class CreateDailyLogDto {
   @IsOptional()
   notes?: string;
 
+  @IsOptional()
   @IsUUID()
-  logged_by!: string;
+  logged_by?: string;
 }

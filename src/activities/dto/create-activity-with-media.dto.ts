@@ -7,8 +7,9 @@ import {
 } from 'class-validator';
 
 export class CreateActivityWithMediaDto {
+  @IsOptional()
   @IsUUID()
-  tenant_id!: string;
+  tenant_id?: string;
 
   @IsUUID()
   class_id!: string;
@@ -29,10 +30,12 @@ export class CreateActivityWithMediaDto {
   @IsNotEmpty()
   activity_type!: string;
 
+  @IsOptional()
   @IsUUID()
-  created_by!: string;
+  created_by?: string;
 
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  media_urls!: string[];
+  media_urls?: string[];
 }

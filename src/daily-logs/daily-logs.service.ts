@@ -5,6 +5,7 @@ import { DailyLog } from './daily-log.entity';
 import { CreateDailyLogDto } from './dto/create-daily-log.dto';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { toISTDate } from '../utils/date.util';
 
 @Injectable()
 export class DailyLogsService {
@@ -59,7 +60,7 @@ export class DailyLogsService {
 
     await this.notificationsService.notifyParentsOfStudent(
       enrollment.student_id,
-      dto.tenant_id,
+      dto.tenant_id!,
       {
         title: `${emoji} ${dto.category.charAt(0).toUpperCase() + dto.category.slice(1)} Update`,
         body: `${name} ${sentence}`,
@@ -103,8 +104,8 @@ export class DailyLogsService {
 
   /** Return YYYY-MM-DDT00:00:00 for the day after the given date string */
   private nextDay(date: string): string {
-    const d = new Date(date);
+    const d = new Date(date + 'T00:00:00+05:30');
     d.setDate(d.getDate() + 1);
-    return d.toISOString().slice(0, 10) + 'T00:00:00';
+    return toISTDate(d) + 'T00:00:00';
   }
 }

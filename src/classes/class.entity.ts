@@ -23,6 +23,6 @@ export class Class {
   @Column({ type: 'varchar', length: 255, nullable: true })
   description?: string;
 
-  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
 }

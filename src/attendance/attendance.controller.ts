@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
+import { todayIST } from '../utils/date.util';
 
 interface UserJwt {
   userId: string;
@@ -112,7 +113,7 @@ export class AttendanceController {
     @Req() req: Request,
   ) {
     const { tenantId } = req.user as UserJwt;
-    const d = date || new Date().toISOString().slice(0, 10);
+    const d = date || todayIST();
     return this.attendanceService.getDailyReport(tenantId, classId, d);
   }
 
@@ -124,6 +125,17 @@ export class AttendanceController {
     const { tenantId } = req.user as UserJwt;
     return this.attendanceService.broadcastArrival(
       body.class_id, body.date, tenantId,
+    );
+  }
+
+  @Post('bulk-checkout')
+  async bulkCheckout(
+    @Body() body: { attendance_ids: string[] },
+    @Req() req: Request,
+  ) {
+    const { tenantId, userId } = req.user as UserJwt;
+    return this.attendanceService.bulkCheckout(
+      tenantId, body.attendance_ids, userId,
     );
   }
 }

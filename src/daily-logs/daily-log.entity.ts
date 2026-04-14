@@ -43,6 +43,6 @@ export class DailyLog {
   @JoinColumn({ name: 'logged_by' })
   user!: User;
 
-  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
 }

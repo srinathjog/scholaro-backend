@@ -31,7 +31,7 @@ export class TenantSettings {
   @Column({ type: 'varchar', length: 20 })
   contact_phone!: string;
 
-  @UpdateDateColumn({ type: 'timestamp without time zone' })
+  @UpdateDateColumn({ type: 'timestamptz' })
   updated_at!: Date;
 
   @OneToOne(() => Tenant)

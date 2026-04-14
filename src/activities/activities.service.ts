@@ -7,6 +7,7 @@ import { Attendance } from '../attendance/attendance.entity';
 import { CreateActivityWithMediaDto } from './dto/create-activity-with-media.dto';
 import { User } from '../users/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { todayIST, toISTDate } from '../utils/date.util';
 
 @Injectable()
 export class ActivitiesService {
@@ -60,7 +61,7 @@ export class ActivitiesService {
 
     // Fire-and-forget: only push-notify parents of PRESENT students
     if (dto.class_id) {
-      this.notifyPresentParents(dto.class_id, dto.tenant_id, dto.title)
+      this.notifyPresentParents(dto.class_id, dto.tenant_id!, dto.title)
         .catch((err: any) =>
           this.logger.error(`Activity push failed: ${err.message}`),
         );
@@ -97,7 +98,7 @@ export class ActivitiesService {
     const uniqueDates = [
       ...new Set(
         activities.map((a) =>
-          new Date(a.created_at).toISOString().slice(0, 10),
+          toISTDate(a.created_at),
         ),
       ),
     ];
@@ -121,7 +122,7 @@ export class ActivitiesService {
 
     // Enrich activities with is_present
     const data = activities.map((a) => {
-      const actDate = new Date(a.created_at).toISOString().slice(0, 10);
+      const actDate = toISTDate(a.created_at);
       return { ...a, is_present: presentDates.has(actDate) };
     });
 
@@ -154,7 +155,7 @@ export class ActivitiesService {
     tenantId: string,
     title?: string,
   ): Promise<void> {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIST();
 
     // Query today's attendance for this class, joined to enrollment + student for name
     const records = await this.attendanceRepo

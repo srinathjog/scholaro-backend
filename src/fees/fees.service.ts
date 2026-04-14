@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Fee, FeeStructure } from './fee.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
+import { todayIST } from '../utils/date.util';
 import { CreateFeeStructureDto } from './dto/create-fee-structure.dto';
 import { CreateFeeDto } from './dto/create-fee.dto';
 import { RecordPaymentDto } from './dto/record-payment.dto';
@@ -474,7 +475,7 @@ export class FeesService {
    * Intended to be called by a daily cron or manually by admin.
    */
   async markOverdueFees(tenantId: string): Promise<number> {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIST();
 
     const result = await this.feeRepo
       .createQueryBuilder()

@@ -33,7 +33,7 @@ export class TeacherAssignment {
   @Column('uuid')
   academic_year_id!: string;
 
-  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
 
   @ManyToOne(() => Class, { eager: false })

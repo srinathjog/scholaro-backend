@@ -33,6 +33,6 @@ export class Student {
   @Column({ type: 'varchar', length: 100 })
   status: string | undefined;
 
-  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date | undefined;
 }

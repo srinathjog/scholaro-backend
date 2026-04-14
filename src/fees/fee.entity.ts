@@ -46,7 +46,7 @@ export class FeeStructure {
   @Column({ type: 'varchar', length: 20, default: 'one_time' })
   frequency!: 'one_time' | 'monthly' | 'quarterly' | 'half_yearly' | 'yearly';
 
-  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
 }
 
@@ -107,12 +107,12 @@ export class Fee {
   @Column({ type: 'uuid', nullable: true })
   created_by?: string;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   last_reminder_sent?: Date;
 
-  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
 
-  @UpdateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @UpdateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   updated_at!: Date;
 }

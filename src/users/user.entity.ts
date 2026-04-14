@@ -35,13 +35,13 @@ export class User {
   @Column({ type: 'varchar', length: 100, nullable: true })
   reset_password_token!: string | null;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   reset_password_expires!: Date | null;
 
   @Column({ type: 'boolean', default: false })
   is_first_login!: boolean;
 
-  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
   // One user can have many activities
   activities!: import('../activities/activity.entity').Activity[];

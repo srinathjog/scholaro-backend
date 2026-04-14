@@ -37,11 +37,12 @@ export class Attendance {
   @Column('uuid')
   marked_by!: string;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   check_in_time?: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   check_out_time?: Date;
+
 
   @Column({ type: 'varchar', length: 200, nullable: true })
   pickup_by_name?: string;
@@ -55,6 +56,6 @@ export class Attendance {
   @Column({ type: 'uuid', nullable: true })
   checkout_by?: string;
 
-  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
 }

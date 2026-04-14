@@ -42,7 +42,7 @@ export class Enrollment {
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   custom_fee_amount!: string | null;
 
-  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
 
   @ManyToOne(() => Student, { eager: true })

@@ -28,6 +28,6 @@ export class ParentStudent {
   @Column({ type: 'varchar', length: 32 })
   relationship!: string; // e.g., 'father', 'mother', etc.
 
-  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
 }

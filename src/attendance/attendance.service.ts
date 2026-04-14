@@ -1,10 +1,11 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, DataSource } from 'typeorm';
 import { Attendance } from './attendance.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { todayIST } from '../utils/date.util';
 
 @Injectable()
 export class AttendanceService {
@@ -16,10 +17,11 @@ export class AttendanceService {
     @InjectRepository(Enrollment)
     private readonly enrollmentRepo: Repository<Enrollment>,
     private readonly notificationsService: NotificationsService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async checkToday(classId: string, tenantId: string): Promise<{ isMarked: boolean }> {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIST();
     const count = await this.attendanceRepository
       .createQueryBuilder('att')
       .innerJoin('att.enrollment', 'enrollment')
@@ -167,7 +169,7 @@ export class AttendanceService {
     enrollmentIds: string[],
     userId: string,
   ): Promise<Attendance[]> {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIST();
     return this.markBulk(enrollmentIds, today, 'present', tenantId, userId);
   }
 
@@ -298,5 +300,61 @@ export class AttendanceService {
     );
 
     return { notified: presentRecords.length };
+  }
+
+  /**
+   * Bulk checkout: check out multiple students in one transaction.
+   * Sets status to 'checked_out', stamps check_out_time, and notifies parents.
+   */
+  async bulkCheckout(
+    tenantId: string,
+    attendanceIds: string[],
+    userId: string,
+  ): Promise<{ checkedOut: number; notified: number }> {
+    if (!attendanceIds.length) return { checkedOut: 0, notified: 0 };
+
+    const records = await this.attendanceRepository.find({
+      where: { id: In(attendanceIds), tenant_id: tenantId },
+      relations: ['enrollment', 'enrollment.student'],
+    });
+
+    if (!records.length) throw new NotFoundException('No matching attendance records found');
+
+    // Filter: only present/late students who haven't been checked out yet
+    const eligible = records.filter(
+      (r) => (r.status === 'present' || r.status === 'late') && !r.check_out_time,
+    );
+
+    if (!eligible.length) {
+      throw new BadRequestException('No eligible students to check out (already checked out or absent)');
+    }
+
+    const now = new Date();
+
+    await this.dataSource.transaction(async (manager) => {
+      for (const record of eligible) {
+        record.check_out_time = now;
+        record.pickup_by_name = 'Parent';
+        record.checkout_by = userId;
+      }
+      await manager.save(eligible);
+    });
+
+    // Notify parents in background
+    let notified = 0;
+    for (const record of eligible) {
+      if (record.enrollment?.student) {
+        const name = record.enrollment.student.first_name;
+        this.notificationsService
+          .notifyParentsOfStudent(record.enrollment.student_id, tenantId, {
+            title: '\uD83D\uDC4B Pickup Complete',
+            body: `${name} has been picked up by Parent.`,
+          })
+          .then(() => notified++)
+          .catch((err: any) => this.logger.error(`Bulk checkout push failed for ${name}: ${err.message}`));
+      }
+    }
+
+    return { checkedOut: eligible.length, notified };
   }
 }

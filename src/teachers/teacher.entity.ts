@@ -22,6 +22,6 @@ export class Teacher {
   @Column({ type: 'int', nullable: true })
   experience_years: number | null;
 
-  @CreateDateColumn({ type: 'timestamp', nullable: true })
+  @CreateDateColumn({ type: 'timestamptz', nullable: true })
   created_at: Date;
 }

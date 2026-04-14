@@ -29,6 +29,6 @@ export class AcademicYear {
   @Column({ type: 'boolean', default: true })
   is_active!: boolean;
 
-  @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;
 }
