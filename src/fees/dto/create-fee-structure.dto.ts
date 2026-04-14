@@ -30,6 +30,6 @@ export class CreateFeeStructureDto {
   due_date!: string;
 
   @IsOptional()
-  @IsIn(['one_time', 'monthly', 'quarterly', 'yearly'])
-  frequency?: 'one_time' | 'monthly' | 'quarterly' | 'yearly';
+  @IsIn(['one_time', 'monthly', 'quarterly', 'half_yearly', 'yearly'])
+  frequency?: 'one_time' | 'monthly' | 'quarterly' | 'half_yearly' | 'yearly';
 }

@@ -44,7 +44,7 @@ export class FeeStructure {
   due_date!: string;
 
   @Column({ type: 'varchar', length: 20, default: 'one_time' })
-  frequency!: 'one_time' | 'monthly' | 'quarterly' | 'yearly';
+  frequency!: 'one_time' | 'monthly' | 'quarterly' | 'half_yearly' | 'yearly';
 
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at!: Date;

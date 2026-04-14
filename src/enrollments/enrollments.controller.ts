@@ -2,14 +2,17 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Param,
   Body,
   Req,
+  Headers,
   BadRequestException,
   UseGuards,
 } from '@nestjs/common';
 import { EnrollmentsService } from './enrollments.service';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto';
+import { UpdateCustomFeeDto } from './dto/update-custom-fee.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { Request } from 'express';
 
@@ -70,5 +73,23 @@ export class EnrollmentsController {
       throw new BadRequestException('Missing tenantId in request');
     }
     return this.enrollmentsService.getEnrollmentById(id, tenantId);
+  }
+
+  @Patch(':id/custom-fee')
+  async updateCustomFee(
+    @Param('id') id: string,
+    @Body() dto: UpdateCustomFeeDto,
+    @Headers('x-tenant-id') tenantId: string,
+    @Req() req: Request,
+  ) {
+    const tid = tenantId || (req as any).user?.tenantId;
+    if (!tid) {
+      throw new BadRequestException('Missing x-tenant-id header');
+    }
+    return this.enrollmentsService.updateCustomFee(
+      id,
+      tid,
+      dto.custom_fee_amount ?? null,
+    );
   }
 }

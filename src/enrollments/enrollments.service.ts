@@ -2,17 +2,23 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Enrollment } from './enrollment.entity';
+import { Fee } from '../fees/fee.entity';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto';
 
 @Injectable()
 export class EnrollmentsService {
+  private readonly logger = new Logger(EnrollmentsService.name);
+
   constructor(
     @InjectRepository(Enrollment)
     private readonly enrollmentRepository: Repository<Enrollment>,
+    @InjectRepository(Fee)
+    private readonly feeRepository: Repository<Fee>,
   ) {}
 
   async enrollmentExists(
@@ -86,5 +92,46 @@ export class EnrollmentsService {
       .groupBy('e.section_id')
       .getRawMany();
     return result;
+  }
+
+  async updateCustomFee(
+    id: string,
+    tenantId: string,
+    customFeeAmount: string | null,
+  ): Promise<Enrollment> {
+    const enrollment = await this.enrollmentRepository.findOne({
+      where: { id, tenant_id: tenantId },
+    });
+    if (!enrollment) {
+      throw new NotFoundException('Enrollment not found');
+    }
+    enrollment.custom_fee_amount = customFeeAmount || null;
+    const saved = await this.enrollmentRepository.save(enrollment);
+
+    // Update all pending/overdue fee invoices for this enrollment
+    if (customFeeAmount) {
+      const newAmount = parseFloat(customFeeAmount);
+      const pendingFees = await this.feeRepository.find({
+        where: {
+          enrollment_id: id,
+          tenant_id: tenantId,
+          status: In(['pending', 'overdue']),
+        },
+      });
+
+      for (const fee of pendingFees) {
+        fee.total_amount = newAmount;
+        fee.final_amount = newAmount - Number(fee.discount_amount);
+      }
+
+      if (pendingFees.length > 0) {
+        await this.feeRepository.save(pendingFees);
+        this.logger.log(
+          `Updated ${pendingFees.length} pending fee(s) to custom amount ₹${newAmount} for enrollment ${id}`,
+        );
+      }
+    }
+
+    return saved;
   }
 }

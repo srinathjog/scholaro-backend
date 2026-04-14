@@ -47,21 +47,36 @@ export class FeesService {
 
     let invoicesCreated = 0;
     if (enrollments.length > 0) {
-      const fees = enrollments.map((enrollment) => {
-        const totalAmount = Number(saved.amount);
-        return this.feeRepo.create({
-          tenant_id: tenantId,
-          enrollment_id: enrollment.id,
-          fee_structure_id: saved.id,
-          description: saved.name,
-          total_amount: totalAmount,
-          discount_amount: 0,
-          final_amount: totalAmount,
-          paid_amount: 0,
-          due_date: saved.due_date,
-          status: 'pending',
-        });
-      });
+      const structureAmount = Number(saved.amount);
+      const dueDates = this.getInvoiceDueDates(saved.frequency, saved.due_date);
+      const fees: Fee[] = [];
+
+      for (const enrollment of enrollments) {
+        // Use custom fee if set on enrollment, otherwise use structure amount
+        const totalAmount = enrollment.custom_fee_amount
+          ? Number(enrollment.custom_fee_amount)
+          : structureAmount;
+
+        for (const dueDate of dueDates) {
+          fees.push(
+            this.feeRepo.create({
+              tenant_id: tenantId,
+              enrollment_id: enrollment.id,
+              fee_structure_id: saved.id,
+              description: dueDates.length > 1
+                ? `${saved.name} (due ${dueDate})`
+                : saved.name,
+              total_amount: totalAmount,
+              discount_amount: 0,
+              final_amount: totalAmount,
+              paid_amount: 0,
+              due_date: dueDate,
+              status: 'pending',
+            }),
+          );
+        }
+      }
+
       await this.feeRepo.save(fees);
       invoicesCreated = fees.length;
       this.logger.log(
@@ -484,6 +499,28 @@ export class FeesService {
     // Day 0 of next month = last day of current month
     const lastDay = new Date(year, month, 0).getDate();
     return `${yearMonth}-${String(lastDay).padStart(2, '0')}`;
+  }
+
+  /**
+   * Return the list of invoice due dates based on frequency.
+   * - one_time / monthly / yearly → single date (the structure's due_date)
+   * - quarterly → 4 dates, 3 months apart starting from due_date
+   * - half_yearly → 2 dates, 6 months apart starting from due_date
+   */
+  private getInvoiceDueDates(
+    frequency: string,
+    baseDueDate: string,
+  ): string[] {
+    if (frequency === 'half_yearly') {
+      const base = new Date(baseDueDate);
+      const d1 = baseDueDate;
+      const second = new Date(base);
+      second.setMonth(second.getMonth() + 6);
+      const d2 = second.toISOString().slice(0, 10);
+      return [d1, d2];
+    }
+    // For all other frequencies, single invoice with the original due date
+    return [baseDueDate];
   }
 
   // ─── Send Fee Reminder ─────────────────────────────────────────

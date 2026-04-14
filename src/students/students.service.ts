@@ -44,8 +44,52 @@ export class StudentsService {
     return this.studentRepository.save(student);
   }
 
-  async getAllStudents(tenantId: string): Promise<Student[]> {
-    return this.studentRepository.find({ where: { tenant_id: tenantId } });
+  async getAllStudents(tenantId: string) {
+    const students = await this.studentRepository.find({
+      where: { tenant_id: tenantId },
+      order: { first_name: 'ASC' },
+    });
+
+    if (students.length === 0) return [];
+
+    // Batch-fetch active enrollments with class + section names
+    const studentIds = students.map((s) => s.id);
+    const rows: Array<{
+      student_id: string;
+      class_name: string;
+      section_name: string | null;
+    }> = await this.dataSource.query(
+      `SELECT e.student_id,
+              c.name AS class_name,
+              s.name AS section_name
+       FROM enrollments e
+       INNER JOIN classes c ON c.id = e.class_id
+       LEFT JOIN sections s ON s.id = e.section_id
+       WHERE e.tenant_id = $1
+         AND e.status = 'active'
+         AND e.student_id = ANY($2)`,
+      [tenantId, studentIds],
+    );
+
+    const enrollMap = new Map<string, { class_name: string; section_name: string | null }>();
+    for (const row of rows) {
+      // Take the first active enrollment per student
+      if (!enrollMap.has(row.student_id)) {
+        enrollMap.set(row.student_id, {
+          class_name: row.class_name,
+          section_name: row.section_name,
+        });
+      }
+    }
+
+    return students.map((s) => {
+      const enrollment = enrollMap.get(s.id!);
+      return {
+        ...s,
+        current_class: enrollment?.class_name || null,
+        current_section: enrollment?.section_name || null,
+      };
+    });
   }
 
   async getStudentById(id: string, tenantId: string): Promise<Student | null> {
@@ -111,6 +155,7 @@ export class StudentsService {
         section_id: e.section_id,
         className: classMap[e.class_id] || null,
         status: e.status,
+        custom_fee_amount: e.custom_fee_amount ?? null,
       })),
     };
   }

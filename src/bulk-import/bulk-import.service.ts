@@ -201,6 +201,8 @@ export class BulkImportService {
 
     const createdClasses = new Set<string>();
     const createdSections = new Set<string>();
+    const usedClasses = new Set<string>();
+    const usedSections = new Set<string>();
     const classCache = new Map<string, Class>();
     const sectionCache = new Map<string, Section>();
     const parentUserCache = new Map<string, User>(); // email -> User
@@ -250,46 +252,58 @@ export class BulkImportService {
 
         try {
 
-          // Step 1: Find or create class
-          const classKey = row.class_name;
+          // Step 1: Sanitize class and section names
+          const sanitizedClassName = row.class_name.trim().toUpperCase();
+          const sanitizedSectionName = row.section_name.trim().toUpperCase();
+
+          // Step 1a: Find or create class
+          const classKey = sanitizedClassName;
           let klass = classCache.get(classKey);
           if (!klass) {
             klass = await queryRunner.manager.findOne(Class, {
-              where: { tenant_id: tenantId, name: row.class_name },
+              where: { tenant_id: tenantId, name: sanitizedClassName },
             }) ?? undefined;
             if (!klass) {
-              klass = this.classRepo.create({
+              klass = queryRunner.manager.create(Class, {
                 tenant_id: tenantId,
-                name: row.class_name,
+                name: sanitizedClassName,
               });
-              klass = await queryRunner.manager.save(klass);
-              createdClasses.add(row.class_name);
+              klass = await queryRunner.manager.save(Class, klass);
+              createdClasses.add(sanitizedClassName);
+              console.log(`[BulkImport] Class CREATED: "${sanitizedClassName}" for tenant ${tenantId}`);
+            } else {
+              console.log(`[BulkImport] Class found: "${sanitizedClassName}" (id: ${klass.id})`);
             }
             classCache.set(classKey, klass);
           }
+          usedClasses.add(sanitizedClassName);
 
           // Step 1b: Find or create section
-          const sectionKey = `${klass.id}:${row.section_name}`;
+          const sectionKey = `${klass.id}:${sanitizedSectionName}`;
           let section = sectionCache.get(sectionKey);
           if (!section) {
             section = await queryRunner.manager.findOne(Section, {
               where: {
                 tenant_id: tenantId,
                 class_id: klass.id,
-                name: row.section_name,
+                name: sanitizedSectionName,
               },
             }) ?? undefined;
             if (!section) {
-              section = this.sectionRepo.create({
+              section = queryRunner.manager.create(Section, {
                 tenant_id: tenantId,
                 class_id: klass.id,
-                name: row.section_name,
+                name: sanitizedSectionName,
               });
-              section = await queryRunner.manager.save(section);
-              createdSections.add(`${row.class_name}-${row.section_name}`);
+              section = await queryRunner.manager.save(Section, section);
+              createdSections.add(`${sanitizedClassName}-${sanitizedSectionName}`);
+              console.log(`[BulkImport] Section CREATED: "${sanitizedSectionName}" under class "${sanitizedClassName}"`);
+            } else {
+              console.log(`[BulkImport] Section found: "${sanitizedSectionName}" under class "${sanitizedClassName}" (id: ${section.id})`);
             }
             sectionCache.set(sectionKey, section);
           }
+          usedSections.add(`${sanitizedClassName}-${sanitizedSectionName}`);
 
           // Step 1c: Create student
           const student = this.studentRepo.create({
@@ -377,9 +391,13 @@ export class BulkImportService {
 
       const failureCount = skipped;
       const parts = [`Imported ${imported} students`];
+      if (createdClasses.size) parts.push(`created ${createdClasses.size} new classes`);
+      if (createdSections.size) parts.push(`created ${createdSections.size} new sections`);
       if (parentsCreated) parts.push(`created ${parentsCreated} parent accounts`);
       if (parentsLinked) parts.push(`linked ${parentsLinked} parent-student relationships`);
       if (failureCount) parts.push(`${failureCount} rows failed`);
+
+      console.log(`[BulkImport] COMPLETE — ${parts.join(', ')}. Classes used: [${[...usedClasses].join(', ')}], Sections used: [${[...usedSections].join(', ')}]`);
 
       return {
         success: true,
@@ -387,6 +405,8 @@ export class BulkImportService {
         failureCount,
         newClasses: createdClasses.size,
         newSections: createdSections.size,
+        totalClassesUsed: usedClasses.size,
+        totalSectionsUsed: usedSections.size,
         parentsCreated,
         parentsLinked,
         errors,
