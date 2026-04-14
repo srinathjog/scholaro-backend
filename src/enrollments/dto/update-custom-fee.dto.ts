@@ -1,7 +1,9 @@
-import { IsOptional, IsNumberString } from 'class-validator';
+import { IsOptional, IsNumber } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateCustomFeeDto {
   @IsOptional()
-  @IsNumberString()
-  custom_fee_amount?: string | null;
+  @IsNumber()
+  @Type(() => Number)
+  custom_fee_amount?: number | null;
 }

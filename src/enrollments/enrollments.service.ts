@@ -97,7 +97,7 @@ export class EnrollmentsService {
   async updateCustomFee(
     id: string,
     tenantId: string,
-    customFeeAmount: string | null,
+    customFeeAmount: number | null,
   ): Promise<Enrollment> {
     const enrollment = await this.enrollmentRepository.findOne({
       where: { id, tenant_id: tenantId },
@@ -105,12 +105,11 @@ export class EnrollmentsService {
     if (!enrollment) {
       throw new NotFoundException('Enrollment not found');
     }
-    enrollment.custom_fee_amount = customFeeAmount || null;
+    enrollment.custom_fee_amount = customFeeAmount != null ? String(customFeeAmount) : null;
     const saved = await this.enrollmentRepository.save(enrollment);
 
     // Update all pending/overdue fee invoices for this enrollment
-    if (customFeeAmount) {
-      const newAmount = parseFloat(customFeeAmount);
+    if (customFeeAmount != null) {
       const pendingFees = await this.feeRepository.find({
         where: {
           enrollment_id: id,
@@ -120,14 +119,14 @@ export class EnrollmentsService {
       });
 
       for (const fee of pendingFees) {
-        fee.total_amount = newAmount;
-        fee.final_amount = newAmount - Number(fee.discount_amount);
+        fee.total_amount = customFeeAmount;
+        fee.final_amount = customFeeAmount - Number(fee.discount_amount);
       }
 
       if (pendingFees.length > 0) {
         await this.feeRepository.save(pendingFees);
         this.logger.log(
-          `Updated ${pendingFees.length} pending fee(s) to custom amount ₹${newAmount} for enrollment ${id}`,
+          `Updated ${pendingFees.length} pending fee(s) to custom amount ₹${customFeeAmount} for enrollment ${id}`,
         );
       }
     }

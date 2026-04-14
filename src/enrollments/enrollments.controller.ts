@@ -89,7 +89,7 @@ export class EnrollmentsController {
     return this.enrollmentsService.updateCustomFee(
       id,
       tid,
-      dto.custom_fee_amount ?? null,
+      dto.custom_fee_amount !== undefined ? dto.custom_fee_amount : null,
     );
   }
 }
