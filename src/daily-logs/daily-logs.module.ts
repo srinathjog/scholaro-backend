@@ -5,9 +5,10 @@ import { DailyLogsService } from './daily-logs.service';
 import { DailyLog } from './daily-log.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ParentsModule } from '../parents/parents.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DailyLog, Enrollment]), NotificationsModule],
+  imports: [TypeOrmModule.forFeature([DailyLog, Enrollment]), NotificationsModule, ParentsModule],
   controllers: [DailyLogsController],
   providers: [DailyLogsService],
 })

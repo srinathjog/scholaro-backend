@@ -6,9 +6,10 @@ import { Activity } from './activity.entity';
 import { ActivityMedia } from './activity-media.entity';
 import { Attendance } from '../attendance/attendance.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ParentsModule } from '../parents/parents.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Activity, ActivityMedia, Attendance]), NotificationsModule],
+  imports: [TypeOrmModule.forFeature([Activity, ActivityMedia, Attendance]), NotificationsModule, ParentsModule],
   controllers: [ActivitiesController],
   providers: [ActivitiesService],
 })

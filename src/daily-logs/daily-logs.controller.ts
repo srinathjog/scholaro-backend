@@ -1,7 +1,10 @@
-import { Controller, Post, Body, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Query, Req, UseGuards, ForbiddenException } from '@nestjs/common';
 import { DailyLogsService } from './daily-logs.service';
 import { CreateDailyLogDto } from './dto/create-daily-log.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { ParentsService } from '../parents/parents.service';
 import type { Request } from 'express';
 
 interface AuthRequest extends Request {
@@ -9,12 +12,17 @@ interface AuthRequest extends Request {
 }
 
 @Controller('daily-logs')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class DailyLogsController {
-  constructor(private readonly dailyLogsService: DailyLogsService) {}
+  constructor(
+    private readonly dailyLogsService: DailyLogsService,
+    private readonly parentsService: ParentsService,
+  ) {}
 
   // POST /daily-logs
   @UseGuards(JwtAuthGuard)
   @Post()
+  @Roles('SCHOOL_ADMIN', 'TEACHER')
   async create(@Body() dto: CreateDailyLogDto, @Req() req: AuthRequest) {
     dto.tenant_id = req.user.tenantId;
     dto.logged_by = req.user.userId;
@@ -24,6 +32,7 @@ export class DailyLogsController {
   // POST /daily-logs/bulk
   @UseGuards(JwtAuthGuard)
   @Post('bulk')
+  @Roles('SCHOOL_ADMIN', 'TEACHER')
   async createBulk(
     @Body() body: { enrollment_ids: string[]; category: string; log_value: string; notes?: string },
     @Req() req: AuthRequest,
@@ -51,6 +60,14 @@ export class DailyLogsController {
     @Query('date') date: string,
     @Req() req: AuthRequest,
   ) {
+    // If caller is a PARENT, verify they own this enrollment
+    if (req.user.roles.includes('PARENT')) {
+      await this.parentsService.validateParentOwnsEnrollment(
+        req.user.userId,
+        enrollmentId,
+        req.user.tenantId,
+      );
+    }
     return this.dailyLogsService.findByStudentAndDate(
       req.user.tenantId,
       enrollmentId,
@@ -61,6 +78,7 @@ export class DailyLogsController {
   // GET /daily-logs/class/:classId?date=YYYY-MM-DD
   @UseGuards(JwtAuthGuard)
   @Get('class/:classId')
+  @Roles('SCHOOL_ADMIN', 'TEACHER')
   async getClassSummary(
     @Param('classId') classId: string,
     @Query('date') date: string,

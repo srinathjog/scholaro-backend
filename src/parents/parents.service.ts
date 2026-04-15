@@ -43,6 +43,37 @@ export class ParentsService {
     private readonly mailService: MailService,
   ) {}
 
+  /** Throws ForbiddenException if the parent does not own the given enrollment. */
+  async validateParentOwnsEnrollment(
+    parentUserId: string,
+    enrollmentId: string,
+    tenantId: string,
+  ): Promise<void> {
+    const rows = await this.parentStudentRepo.manager.query(
+      `SELECT 1 FROM parent_students ps
+       JOIN enrollments e ON e.student_id = ps.student_id AND e.tenant_id = ps.tenant_id
+       WHERE ps.parent_user_id = $1 AND e.id = $2 AND ps.tenant_id = $3
+       LIMIT 1`,
+      [parentUserId, enrollmentId, tenantId],
+    );
+    if (!rows.length)
+      throw new ForbiddenException('You do not have access to this student');
+  }
+
+  /** Returns all enrollment IDs belonging to the parent's linked children. */
+  async getParentEnrollmentIds(
+    parentUserId: string,
+    tenantId: string,
+  ): Promise<string[]> {
+    const rows = await this.parentStudentRepo.manager.query(
+      `SELECT e.id FROM parent_students ps
+       JOIN enrollments e ON e.student_id = ps.student_id AND e.tenant_id = ps.tenant_id
+       WHERE ps.parent_user_id = $1 AND ps.tenant_id = $2`,
+      [parentUserId, tenantId],
+    );
+    return rows.map((r: any) => r.id);
+  }
+
   async linkParentToStudent(dto: LinkParentStudentDto, tenantId: string) {
     // Prevent duplicate
     const exists = await this.parentStudentRepo.findOne({

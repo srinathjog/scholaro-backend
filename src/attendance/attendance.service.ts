@@ -137,6 +137,20 @@ export class AttendanceService {
     });
     if (!record) throw new NotFoundException('Attendance record not found');
 
+    // Guard: block double checkout
+    if (record.check_out_time) {
+      throw new BadRequestException(
+        `This student was already checked out at ${record.check_out_time.toISOString()}.`,
+      );
+    }
+
+    // Guard: must be checked in
+    if (record.status !== 'present' && record.status !== 'late') {
+      throw new BadRequestException(
+        `Cannot check out a student who is marked as "${record.status}".`,
+      );
+    }
+
     record.check_out_time = new Date();
     record.pickup_by_name = pickupByName;
     record.pickup_by_photo_url = pickupByPhotoUrl;
@@ -286,8 +300,13 @@ export class AttendanceService {
     const presentRecords = records.filter((r) => r.status === 'present');
     if (!presentRecords.length) return { notified: 0 };
 
+    // Guard: skip students who already have check_in_time stamped AND a broadcast_sent flag
+    // We use a simple check: only notify if check_out_time is null (still at school)
+    const eligibleRecords = presentRecords.filter((r) => !r.check_out_time);
+    if (!eligibleRecords.length) return { notified: 0 };
+
     await Promise.allSettled(
-      presentRecords
+      eligibleRecords
         .filter((r) => r.enrollment?.student)
         .map((record) => {
           const name = record.enrollment.student.first_name;
@@ -299,7 +318,7 @@ export class AttendanceService {
         }),
     );
 
-    return { notified: presentRecords.length };
+    return { notified: eligibleRecords.length };
   }
 
   /**

@@ -104,7 +104,7 @@ export class ParentsController {
   }
 
   @Post('link')
-  @Roles('PARENT')
+  @Roles('SCHOOL_ADMIN')
   async linkParentToStudent(
     @Body() dto: LinkParentStudentDto,
     @Req() req: Request,

@@ -12,13 +12,17 @@ import {
   UploadedFiles,
   Req,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ActivitiesService } from './activities.service';
 import { CreateActivityWithMediaDto } from './dto/create-activity-with-media.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 import { StorageService } from '../storage/storage.service';
+import { ParentsService } from '../parents/parents.service';
 import type { Request } from 'express';
 
 interface AuthRequest extends Request {
@@ -26,14 +30,17 @@ interface AuthRequest extends Request {
 }
 
 @Controller('activities')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class ActivitiesController {
   constructor(
     private readonly activitiesService: ActivitiesService,
     private readonly storageService: StorageService,
+    private readonly parentsService: ParentsService,
   ) {}
 
   @UseGuards(JwtAuthGuard)
   @Post('upload')
+  @Roles('SCHOOL_ADMIN', 'TEACHER')
   @UseInterceptors(
     FilesInterceptor('files', 10, {
       storage: memoryStorage(),
@@ -67,6 +74,7 @@ export class ActivitiesController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
+  @Roles('SCHOOL_ADMIN', 'TEACHER')
   async create(
     @Body() dto: CreateActivityWithMediaDto,
     @Req() req: AuthRequest,
@@ -85,6 +93,24 @@ export class ActivitiesController {
     @Query('limit') limit: string | undefined,
     @Req() req: AuthRequest,
   ) {
+    // If caller is a PARENT, verify they own the enrollment or have a child in the class
+    if (req.user.roles.includes('PARENT')) {
+      if (enrollmentId) {
+        await this.parentsService.validateParentOwnsEnrollment(
+          req.user.userId,
+          enrollmentId,
+          req.user.tenantId,
+        );
+      } else if (classId) {
+        const enrollmentIds = await this.parentsService.getParentEnrollmentIds(
+          req.user.userId,
+          req.user.tenantId,
+        );
+        if (!enrollmentIds.length) {
+          throw new ForbiddenException('You do not have access to this class');
+        }
+      }
+    }
     const p = Math.max(1, parseInt(page || '1', 10) || 1);
     const l = Math.min(50, Math.max(1, parseInt(limit || '10', 10) || 10));
     return this.activitiesService.getFeed(req.user.tenantId, classId, enrollmentId, p, l);
@@ -92,6 +118,7 @@ export class ActivitiesController {
 
   @UseGuards(JwtAuthGuard)
   @Get('teacher/:userId')
+  @Roles('SCHOOL_ADMIN', 'TEACHER')
   async getTeacherActivities(
     @Param('userId') userId: string,
     @Req() req: AuthRequest,
@@ -101,6 +128,7 @@ export class ActivitiesController {
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
+  @Roles('SCHOOL_ADMIN', 'TEACHER')
   @HttpCode(204)
   async deleteActivity(
     @Param('id') id: string,

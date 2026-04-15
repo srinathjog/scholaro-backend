@@ -28,5 +28,6 @@ import { Tenant } from '../super-admin/tenant.entity';
   ],
   controllers: [ParentsController],
   providers: [ParentsService],
+  exports: [ParentsService],
 })
 export class ParentsModule {}
