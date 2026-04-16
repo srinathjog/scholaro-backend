@@ -8,6 +8,7 @@ import {
   Query,
   Req,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -115,6 +116,23 @@ export class AttendanceController {
     const { tenantId } = req.user as UserJwt;
     const d = date || todayIST();
     return this.attendanceService.getDailyReport(tenantId, classId, d);
+  }
+
+  @Get('report/monthly/:classId')
+  @Roles('SCHOOL_ADMIN')
+  async getMonthlyReport(
+    @Param('classId') classId: string,
+    @Query('month') month: string,
+    @Query('year') year: string,
+    @Req() req: Request,
+  ) {
+    const { tenantId } = req.user as UserJwt;
+    const monthNum = Number(month);
+    const yearNum = Number(year);
+    if (!month || !year || Number.isNaN(monthNum) || Number.isNaN(yearNum)) {
+      throw new BadRequestException('month and year query parameters are required');
+    }
+    return await this.attendanceService.getMonthlyReport(tenantId, classId, monthNum, yearNum);
   }
 
   @Post('broadcast-arrival')

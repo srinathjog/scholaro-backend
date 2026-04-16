@@ -291,6 +291,67 @@ export class AttendanceService {
     };
   }
 
+  async getMonthlyReport(
+    tenantId: string,
+    classId: string,
+    month: number,
+    year: number,
+  ): Promise<Array<{ studentName: string; totalDays: number; presentCount: number; absentCount: number; percentage: number }>> {
+    if (!month || !year || month < 1 || month > 12 || year < 1900) {
+      throw new BadRequestException('Month and year must be valid values');
+    }
+
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endDate = new Date(year, month, 0).toISOString().slice(0, 10);
+
+    const enrollments = await this.enrollmentRepo.find({
+      where: { tenant_id: tenantId, class_id: classId },
+      relations: ['student'],
+    });
+
+    if (!enrollments.length) return [];
+
+    const enrollmentIds = enrollments.map((enrollment) => enrollment.id);
+    const attendanceRows = await this.attendanceRepository
+      .createQueryBuilder('a')
+      .select('a.enrollment_id', 'enrollmentId')
+      .addSelect("SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END)", 'presentCount')
+      .addSelect("SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END)", 'absentCount')
+      .addSelect("SUM(CASE WHEN a.status = 'leave' THEN 1 ELSE 0 END)", 'leaveCount')
+      .where('a.tenant_id = :tenantId', { tenantId })
+      .andWhere('a.enrollment_id IN (:...enrollmentIds)', { enrollmentIds })
+      .andWhere('a.date BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .groupBy('a.enrollment_id')
+      .getRawMany();
+
+    const attendanceMap = new Map(
+      attendanceRows.map((row) => [
+        row.enrollmentId,
+        {
+          presentCount: parseInt(row.presentCount, 10) || 0,
+          absentCount: parseInt(row.absentCount, 10) || 0,
+          leaveCount: parseInt(row.leaveCount, 10) || 0,
+        },
+      ]),
+    );
+
+    return enrollments.map((enrollment) => {
+      const student = enrollment.student;
+      const studentName = [student.first_name, student.last_name].filter(Boolean).join(' ');
+      const counts = attendanceMap.get(enrollment.id) ?? { presentCount: 0, absentCount: 0, leaveCount: 0 };
+      const totalDays = counts.presentCount + counts.absentCount + counts.leaveCount;
+      const percentage = totalDays ? Math.round((counts.presentCount / totalDays) * 100) : 0;
+
+      return {
+        studentName,
+        totalDays,
+        presentCount: counts.presentCount,
+        absentCount: counts.absentCount,
+        percentage,
+      };
+    });
+  }
+
   async broadcastArrival(
     classId: string,
     date: string,

@@ -140,8 +140,34 @@ export class ActivitiesService {
 
   // Delete an activity and its media (tenant-scoped)
   async deleteActivity(id: string, tenantId: string) {
-    await this.activityMediaRepo.delete({ activity: { id } });
-    await this.activityRepo.delete({ id, tenant_id: tenantId });
+    // Ensure the activity belongs to the tenant
+    const activity = await this.activityRepo.findOne({ where: { id, tenant_id: tenantId } });
+    if (!activity) throw new Error('Activity not found or access denied');
+    // Transaction: delete activity (media should be CASCADE)
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(Activity, { id, tenant_id: tenantId });
+    });
+  }
+
+  // Update activity fields (title, description, class_id, section_id)
+  async updateActivity(id: string, tenantId: string, updateDto: Partial<{ title: string; description: string; class_id: string; section_id: string }>) {
+    const activity = await this.activityRepo.findOne({ where: { id, tenant_id: tenantId } });
+    if (!activity) throw new Error('Activity not found or access denied');
+
+    if (updateDto.title !== undefined) activity.title = updateDto.title;
+    if (updateDto.description !== undefined) activity.description = updateDto.description;
+    if (updateDto.class_id !== undefined) activity.class_id = updateDto.class_id;
+    if (updateDto.section_id !== undefined) activity.section_id = updateDto.section_id;
+
+    await this.activityRepo.save(activity);
+    return activity;
+  }
+
+  async getActivityById(id: string, tenantId: string) {
+    return this.activityRepo.findOne({
+      where: { id, tenant_id: tenantId },
+      relations: ['media', 'assignedClass'],
+    });
   }
 
   /**

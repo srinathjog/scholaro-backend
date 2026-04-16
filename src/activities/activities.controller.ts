@@ -6,6 +6,7 @@ import {
   Query,
   Param,
   Delete,
+  Patch,
   HttpCode,
   UseInterceptors,
   UseGuards,
@@ -127,6 +128,15 @@ export class ActivitiesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get(':id')
+  async getActivityById(
+    @Param('id') id: string,
+    @Req() req: AuthRequest,
+  ) {
+    return this.activitiesService.getActivityById(id, req.user.tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   @Roles('SCHOOL_ADMIN', 'TEACHER')
   @HttpCode(204)
@@ -135,5 +145,16 @@ export class ActivitiesController {
     @Req() req: AuthRequest,
   ) {
     return this.activitiesService.deleteActivity(id, req.user.tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  @Roles('SCHOOL_ADMIN', 'TEACHER')
+  async updateActivity(
+    @Param('id') id: string,
+    @Body() updateDto: Partial<{ title: string; description: string; class_id: string; section_id: string }>,
+    @Req() req: AuthRequest,
+  ) {
+    return this.activitiesService.updateActivity(id, req.user.tenantId, updateDto);
   }
 }
