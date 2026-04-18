@@ -37,16 +37,21 @@ export class AnalyticsService {
   constructor(private readonly dataSource: DataSource) {}
 
   async getSchoolStats(tenantId: string): Promise<SchoolStats> {
-    const [overview, attendance, financials, engagement, alerts] =
-      await Promise.all([
-        this.getOverview(tenantId),
-        this.getAttendance(tenantId),
-        this.getFinancials(tenantId),
-        this.getEngagement(tenantId),
-        this.getAlerts(tenantId),
-      ]);
-
-    return { overview, attendance, financials, engagement, alerts };
+    try {
+      const [overview, attendance, financials, engagement, alerts] =
+        await Promise.all([
+          this.getOverview(tenantId),
+          this.getAttendance(tenantId),
+          this.getFinancials(tenantId),
+          this.getEngagement(tenantId),
+          this.getAlerts(tenantId),
+        ]);
+      return { overview, attendance, financials, engagement, alerts };
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('[AnalyticsService] getSchoolStats failed:', error);
+      throw new Error('Failed to fetch school stats. See server logs for details.');
+    }
   }
 
   private async getOverview(tenantId: string): Promise<SchoolStats['overview']> {

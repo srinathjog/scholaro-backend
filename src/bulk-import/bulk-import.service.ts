@@ -17,6 +17,7 @@ import { AcademicYear } from '../academic-years/academic-year.entity';
 import { ParentStudent } from '../parents/parent-student.entity';
 import { Tenant } from '../super-admin/tenant.entity';
 import { MailService } from '../mail/mail.service';
+import { FeeStructure, Fee } from '../fees/fee.entity';
 import * as bcrypt from 'bcryptjs';
 import * as ExcelJS from 'exceljs';
 
@@ -371,7 +372,7 @@ export class BulkImportService {
           const monthStart = `${yyyy}-${mm}-01`;
           const monthEnd = new Date(yyyy, now.getMonth() + 1, 0); // last day of month
           // Find fee structure for this class/section/academic year (simplified: first match)
-          const feeStructure = await queryRunner.manager.findOne('fee_structures', {
+          const feeStructure = await queryRunner.manager.findOne(FeeStructure, {
             where: {
               tenant_id: tenantId,
               class_id: klass.id,
@@ -381,7 +382,7 @@ export class BulkImportService {
           });
           if (feeStructure) {
             // Check for existing fee for this enrollment and month
-            const existingFee = await queryRunner.manager.findOne('fees', {
+            const existingFee = await queryRunner.manager.findOne(Fee, {
               where: {
                 tenant_id: tenantId,
                 enrollment_id: enrollment.id,
@@ -398,12 +399,12 @@ export class BulkImportService {
                 if (Number(existingFee.total_amount) !== newAmount) {
                   existingFee.total_amount = newAmount;
                   existingFee.final_amount = newAmount;
-                  await queryRunner.manager.save('fees', existingFee);
+                  await queryRunner.manager.save(Fee, existingFee);
                 }
               }
             } else {
               // No fee exists: create new pending fee
-              const newFee = queryRunner.manager.create('fees', {
+              const newFee = queryRunner.manager.create(Fee, {
                 tenant_id: tenantId,
                 enrollment_id: enrollment.id,
                 fee_structure_id: feeStructure.id,
@@ -415,7 +416,7 @@ export class BulkImportService {
                 due_date: monthStart,
                 status: 'pending',
               });
-              await queryRunner.manager.save('fees', newFee);
+              await queryRunner.manager.save(Fee, newFee);
             }
           }
 

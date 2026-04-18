@@ -21,7 +21,11 @@ export class DailyLogsService {
   ) {}
 
   private readonly categoryEmoji: Record<string, string> = {
-    meal: '🍲', nap: '😴', potty: '🚽', mood: '😊', health: '💪',
+    meal: '🍲',
+    nap: '😴',
+    potty: '🚽',
+    mood: '😊',
+    health: '💪',
   };
 
   async create(dto: CreateDailyLogDto): Promise<DailyLog> {
@@ -49,11 +53,37 @@ export class DailyLogsService {
     const value = dto.log_value.replace(/_/g, ' ');
 
     const sentences: Record<string, Record<string, string>> = {
-      meal: { finished: 'finished the entire meal!', half: 'ate half the meal.', not_eaten: "didn't eat today.", skipped: 'skipped the meal.' },
-      nap: { slept_well: 'slept really well!', '1hr_plus': 'napped for over an hour!', short_nap: 'had a short nap.', no_nap: "didn't nap today.", sleeping: 'is sleeping peacefully.' },
-      mood: { happy: 'is having a great time! 🎉', playful: 'is feeling super playful!', fussy: 'was a little fussy.', quiet: 'was quiet today.', cranky: 'was a bit cranky.' },
-      potty: { dry: 'stayed dry — great job!', normal: 'had a normal potty break.', wet: 'had a wet diaper.', changed: 'was changed.' },
-      health: { fine: 'is feeling healthy!', mild_fever: 'has a mild fever.', sick: 'is feeling under the weather.' },
+      meal: {
+        finished: 'finished the entire meal!',
+        half: 'ate half the meal.',
+        not_eaten: "didn't eat today.",
+        skipped: 'skipped the meal.',
+      },
+      nap: {
+        slept_well: 'slept really well!',
+        '1hr_plus': 'napped for over an hour!',
+        short_nap: 'had a short nap.',
+        no_nap: "didn't nap today.",
+        sleeping: 'is sleeping peacefully.',
+      },
+      mood: {
+        happy: 'is having a great time! 🎉',
+        playful: 'is feeling super playful!',
+        fussy: 'was a little fussy.',
+        quiet: 'was quiet today.',
+        cranky: 'was a bit cranky.',
+      },
+      potty: {
+        dry: 'stayed dry — great job!',
+        normal: 'had a normal potty break.',
+        wet: 'had a wet diaper.',
+        changed: 'was changed.',
+      },
+      health: {
+        fine: 'is feeling healthy!',
+        mild_fever: 'has a mild fever.',
+        sick: 'is feeling under the weather.',
+      },
     };
 
     const sentence = sentences[dto.category]?.[dto.log_value] || `— ${value}`;
@@ -78,7 +108,9 @@ export class DailyLogsService {
       .createQueryBuilder('log')
       .where('log.tenant_id = :tenantId', { tenantId })
       .andWhere('log.enrollment_id = :enrollmentId', { enrollmentId })
-      .andWhere('log.created_at >= :dateStart', { dateStart: `${date}T00:00:00` })
+      .andWhere('log.created_at >= :dateStart', {
+        dateStart: `${date}T00:00:00`,
+      })
       .andWhere('log.created_at < :dateEnd', { dateEnd: this.nextDay(date) })
       .orderBy('log.created_at', 'ASC')
       .getMany();
@@ -95,7 +127,9 @@ export class DailyLogsService {
       .innerJoinAndSelect('enrollment.student', 'student')
       .where('log.tenant_id = :tenantId', { tenantId })
       .andWhere('enrollment.class_id = :classId', { classId })
-      .andWhere('log.created_at >= :dateStart', { dateStart: `${date}T00:00:00` })
+      .andWhere('log.created_at >= :dateStart', {
+        dateStart: `${date}T00:00:00`,
+      })
       .andWhere('log.created_at < :dateEnd', { dateEnd: this.nextDay(date) })
       .orderBy('student.first_name', 'ASC')
       .addOrderBy('log.created_at', 'ASC')
