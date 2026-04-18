@@ -241,6 +241,7 @@ export class BulkImportService {
         );
       }
 
+      let studentsUpdatedCount = 0;
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i].data;
         const rowNumber = rows[i].rowNumber;
@@ -251,7 +252,6 @@ export class BulkImportService {
         await queryRunner.query(`SAVEPOINT ${savepointName}`);
 
         try {
-
           // Step 1: Sanitize class and section names
           const sanitizedClassName = row.class_name.trim().toUpperCase();
           const sanitizedSectionName = row.section_name.trim().toUpperCase();
@@ -270,9 +270,6 @@ export class BulkImportService {
               });
               klass = await queryRunner.manager.save(Class, klass);
               createdClasses.add(sanitizedClassName);
-              console.log(`[BulkImport] Class CREATED: "${sanitizedClassName}" for tenant ${tenantId}`);
-            } else {
-              console.log(`[BulkImport] Class found: "${sanitizedClassName}" (id: ${klass.id})`);
             }
             classCache.set(classKey, klass);
           }
@@ -297,37 +294,130 @@ export class BulkImportService {
               });
               section = await queryRunner.manager.save(Section, section);
               createdSections.add(`${sanitizedClassName}-${sanitizedSectionName}`);
-              console.log(`[BulkImport] Section CREATED: "${sanitizedSectionName}" under class "${sanitizedClassName}"`);
-            } else {
-              console.log(`[BulkImport] Section found: "${sanitizedSectionName}" under class "${sanitizedClassName}" (id: ${section.id})`);
             }
             sectionCache.set(sectionKey, section);
           }
           usedSections.add(`${sanitizedClassName}-${sanitizedSectionName}`);
 
-          // Step 1c: Create student
-          const student = this.studentRepo.create({
-            tenant_id: tenantId,
-            first_name: row.first_name,
-            last_name: row.last_name,
-            date_of_birth: parseDate(row.dob),
-            gender: row.gender,
-            admission_date: new Date(),
-            status: 'active',
+          // Step 1c: Upsert student by identity
+          const matchFirstName = row.first_name.trim().toUpperCase();
+          const matchLastName = row.last_name.trim().toUpperCase();
+          const matchDob = parseDate(row.dob);
+          let savedStudent = await queryRunner.manager.findOne(Student, {
+            where: {
+              tenant_id: tenantId,
+              first_name: matchFirstName,
+              last_name: matchLastName,
+              date_of_birth: matchDob,
+            },
           });
-          const savedStudent = await queryRunner.manager.save(student);
+          let isUpdate = false;
+          if (savedStudent) {
+            // Update student fields if changed
+            isUpdate = true;
+            savedStudent.gender = row.gender;
+            savedStudent.first_name = row.first_name;
+            savedStudent.last_name = row.last_name;
+            await queryRunner.manager.save(Student, savedStudent);
+            studentsUpdatedCount++;
+          } else {
+            // Create new student
+            const student = this.studentRepo.create({
+              tenant_id: tenantId,
+              first_name: matchFirstName,
+              last_name: matchLastName,
+              date_of_birth: matchDob,
+              gender: row.gender,
+              admission_date: new Date(),
+              status: 'active',
+            });
+            savedStudent = await queryRunner.manager.save(student);
+            imported++;
+          }
 
-          // Step 2: Create enrollment (uses auto-detected active academic year)
-          const enrollment = this.enrollmentRepo.create({
-            tenant_id: tenantId,
-            student_id: savedStudent.id,
-            class_id: klass.id,
-            section_id: section.id,
-            academic_year_id: activeAcademicYear.id,
-            roll_number: '',
-            status: 'active',
+          // Step 2: Upsert enrollment for this academic year
+          let enrollment = await queryRunner.manager.findOne(Enrollment, {
+            where: {
+              tenant_id: tenantId,
+              student_id: savedStudent.id,
+              academic_year_id: activeAcademicYear.id,
+            },
           });
-          await queryRunner.manager.save(enrollment);
+          if (enrollment) {
+            // Update class/section if changed
+            enrollment.class_id = klass.id;
+            enrollment.section_id = section.id;
+            enrollment.status = 'active';
+            await queryRunner.manager.save(Enrollment, enrollment);
+          } else {
+            enrollment = this.enrollmentRepo.create({
+              tenant_id: tenantId,
+              student_id: savedStudent.id,
+              class_id: klass.id,
+              section_id: section.id,
+              academic_year_id: activeAcademicYear.id,
+              roll_number: '',
+              status: 'active',
+            });
+            enrollment = await queryRunner.manager.save(Enrollment, enrollment);
+          }
+
+          // Step 2b: Fee protection logic (skip fee creation if PAID exists for this enrollment/month)
+          // Step 2b: Fee creation with 'PAID' protection
+          // For demo: assume a single monthly fee structure per class, due on the 1st of each month
+          const now = new Date();
+          const yyyy = now.getFullYear();
+          const mm = String(now.getMonth() + 1).padStart(2, '0');
+          const monthStart = `${yyyy}-${mm}-01`;
+          const monthEnd = new Date(yyyy, now.getMonth() + 1, 0); // last day of month
+          // Find fee structure for this class/section/academic year (simplified: first match)
+          const feeStructure = await queryRunner.manager.findOne('fee_structures', {
+            where: {
+              tenant_id: tenantId,
+              class_id: klass.id,
+              academic_year_id: activeAcademicYear.id,
+            },
+            order: { due_date: 'ASC' },
+          });
+          if (feeStructure) {
+            // Check for existing fee for this enrollment and month
+            const existingFee = await queryRunner.manager.findOne('fees', {
+              where: {
+                tenant_id: tenantId,
+                enrollment_id: enrollment.id,
+                fee_structure_id: feeStructure.id,
+                due_date: monthStart,
+              },
+            });
+            if (existingFee) {
+              if (existingFee.status === 'paid') {
+                // Do not create new fee
+              } else if (existingFee.status === 'pending') {
+                // Update amount if changed (simulate: use feeStructure.amount)
+                const newAmount = Number(feeStructure.amount);
+                if (Number(existingFee.total_amount) !== newAmount) {
+                  existingFee.total_amount = newAmount;
+                  existingFee.final_amount = newAmount;
+                  await queryRunner.manager.save('fees', existingFee);
+                }
+              }
+            } else {
+              // No fee exists: create new pending fee
+              const newFee = queryRunner.manager.create('fees', {
+                tenant_id: tenantId,
+                enrollment_id: enrollment.id,
+                fee_structure_id: feeStructure.id,
+                description: feeStructure.name,
+                total_amount: Number(feeStructure.amount),
+                discount_amount: 0,
+                final_amount: Number(feeStructure.amount),
+                paid_amount: 0,
+                due_date: monthStart,
+                status: 'pending',
+              });
+              await queryRunner.manager.save('fees', newFee);
+            }
+          }
 
           // Step 3: Handle Father
           if (row.father_email && parentRole) {
@@ -365,7 +455,6 @@ export class BulkImportService {
 
           // Row succeeded — release savepoint
           await queryRunner.query(`RELEASE SAVEPOINT ${savepointName}`);
-          imported++;
         } catch (rowErr: any) {
           // Row failed — roll back only this row's changes, continue with next
           await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
@@ -391,6 +480,7 @@ export class BulkImportService {
 
       const failureCount = skipped;
       const parts = [`Imported ${imported} students`];
+      if (studentsUpdatedCount) parts.push(`updated ${studentsUpdatedCount} students`);
       if (createdClasses.size) parts.push(`created ${createdClasses.size} new classes`);
       if (createdSections.size) parts.push(`created ${createdSections.size} new sections`);
       if (parentsCreated) parts.push(`created ${parentsCreated} parent accounts`);
@@ -402,6 +492,7 @@ export class BulkImportService {
       return {
         success: true,
         successCount: imported,
+        studentsUpdatedCount,
         failureCount,
         newClasses: createdClasses.size,
         newSections: createdSections.size,
