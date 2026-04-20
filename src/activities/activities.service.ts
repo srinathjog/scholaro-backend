@@ -36,6 +36,7 @@ export class ActivitiesService {
         description: dto.description,
         activity_type: dto.activity_type,
         created_by: dto.created_by,
+        student_id: dto.student_id ?? null,
         user: { id: dto.created_by } as User,
       });
 

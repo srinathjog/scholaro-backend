@@ -1,6 +1,10 @@
-import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, ILike } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Student } from './student.entity';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { ParentStudent } from '../parents/parent-student.entity';
@@ -71,7 +75,10 @@ export class StudentsService {
       [tenantId, studentIds],
     );
 
-    const enrollMap = new Map<string, { class_name: string; section_name: string | null }>();
+    const enrollMap = new Map<
+      string,
+      { class_name: string; section_name: string | null }
+    >();
     for (const row of rows) {
       // Take the first active enrollment per student
       if (!enrollMap.has(row.student_id)) {
@@ -137,7 +144,7 @@ export class StudentsService {
 
     // Fetch class names for enrollments
     let classMap: Record<string, string> = {};
-    const classIds = [...new Set(enrollments.map(e => e.class_id))];
+    const classIds = [...new Set(enrollments.map((e) => e.class_id))];
     if (classIds.length) {
       const classes = await this.dataSource.query(
         `SELECT id, name FROM classes WHERE tenant_id = $1 AND id = ANY($2)`,
@@ -149,7 +156,7 @@ export class StudentsService {
     return {
       ...student,
       parents,
-      enrollments: enrollments.map(e => ({
+      enrollments: enrollments.map((e) => ({
         id: e.id,
         class_id: e.class_id,
         section_id: e.section_id,
@@ -194,9 +201,14 @@ export class StudentsService {
 
     // Prevent duplicate
     const existing = await this.parentStudentRepo.findOne({
-      where: { parent_user_id: parentUserId, student_id: studentId, tenant_id: tenantId },
+      where: {
+        parent_user_id: parentUserId,
+        student_id: studentId,
+        tenant_id: tenantId,
+      },
     });
-    if (existing) throw new ConflictException('Parent already linked to this student');
+    if (existing)
+      throw new ConflictException('Parent already linked to this student');
 
     const link = this.parentStudentRepo.create({
       tenant_id: tenantId,
@@ -248,14 +260,25 @@ export class StudentsService {
       // Send parent welcome email (fire-and-forget)
       const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
       const schoolName = tenant?.name || 'Your School';
-      this.mailService.sendWelcomeEmail(dto.email, student.first_name || dto.name, schoolName, 'Welcome@Scholaro2026', tenant?.tenant_code);
+      this.mailService.sendWelcomeEmail(
+        dto.email,
+        student.first_name || dto.name,
+        schoolName,
+        'Welcome@Scholaro2026',
+        tenant?.tenant_code,
+      );
     }
 
     // Link to student
     const existing = await this.parentStudentRepo.findOne({
-      where: { parent_user_id: user.id, student_id: studentId, tenant_id: tenantId },
+      where: {
+        parent_user_id: user.id,
+        student_id: studentId,
+        tenant_id: tenantId,
+      },
     });
-    if (existing) throw new ConflictException('Parent already linked to this student');
+    if (existing)
+      throw new ConflictException('Parent already linked to this student');
 
     const link = this.parentStudentRepo.create({
       tenant_id: tenantId,
@@ -265,6 +288,41 @@ export class StudentsService {
     });
     await this.parentStudentRepo.save(link);
 
-    return { parent_user_id: user.id, name: user.name, email: user.email, relationship: dto.relationship };
+    return {
+      parent_user_id: user.id,
+      name: user.name,
+      email: user.email,
+      relationship: dto.relationship,
+    };
+  }
+
+  async getStudentsByClass(
+    classId: string,
+    sectionId: string | undefined,
+    tenantId: string,
+  ): Promise<{ id: string; first_name: string; last_name: string }[]> {
+    // Single JOIN query: students enrolled in the class, filtered by tenant
+    const params: string[] = [tenantId, classId];
+    let sectionFilter = '';
+    if (sectionId) {
+      sectionFilter = 'AND e.section_id = $3';
+      params.push(sectionId);
+    }
+
+    const rows: { id: string; first_name: string; last_name: string }[] =
+      await this.dataSource.query(
+        `SELECT s.id, s.first_name, s.last_name
+         FROM students s
+         INNER JOIN enrollments e ON e.student_id = s.id
+         WHERE e.tenant_id = $1
+           AND e.class_id = $2
+           ${sectionFilter}
+           AND e.status = 'active'
+           AND s.tenant_id = $1
+         ORDER BY s.first_name ASC`,
+        params,
+      );
+
+    return rows;
   }
 }

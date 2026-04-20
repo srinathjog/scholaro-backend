@@ -111,6 +111,10 @@ export class BulkImportService {
       return String(val).trim();
     };
 
+    /** Convert a string to Title Case: "AARAV SHARMA" or "aarav sharma" → "Aarav Sharma" */
+    const toTitleCase = (str: string): string =>
+      str.trim().replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+
     /** Parse date string in DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, or MM/DD/YYYY formats */
     const parseDate = (raw: string): Date => {
       // Already YYYY-MM-DD
@@ -154,7 +158,7 @@ export class BulkImportService {
       if (!last_name) missing.push('last_name');
       if (!dob) missing.push('dob');
       if (!class_name) missing.push('class_name');
-      if (!section_name) missing.push('section_name');
+      // section_name is now optional
       if (missing.length) {
         preErrors.push({ row: rowNumber, student: label, error: `Missing mandatory fields: ${missing.join(', ')}.` });
         return;
@@ -253,17 +257,19 @@ export class BulkImportService {
         await queryRunner.query(`SAVEPOINT ${savepointName}`);
 
         try {
-          // Step 1: Sanitize class and section names
-          const sanitizedClassName = row.class_name.trim().toUpperCase();
-          const sanitizedSectionName = row.section_name.trim().toUpperCase();
+          // Step 1: Normalize class and section names (ignore case and spaces)
+          const normalize = (name: string) => name.trim().toLowerCase().replace(/\s/g, '');
+          const sanitizedClassName = row.class_name.trim();
+          const normalizedClassName = normalize(row.class_name);
+          const sanitizedSectionName = row.section_name ? row.section_name.trim() : '';
+          const normalizedSectionName = row.section_name ? normalize(row.section_name) : '';
 
-          // Step 1a: Find or create class
-          const classKey = sanitizedClassName;
-          let klass = classCache.get(classKey);
+          // Step 1a: Find or create class by normalized name
+          let klass = classCache.get(normalizedClassName);
           if (!klass) {
-            klass = await queryRunner.manager.findOne(Class, {
-              where: { tenant_id: tenantId, name: sanitizedClassName },
-            }) ?? undefined;
+            // Try to find by normalized name
+            const allClasses = await queryRunner.manager.find(Class, { where: { tenant_id: tenantId } });
+            klass = allClasses.find(c => normalize(c.name) === normalizedClassName);
             if (!klass) {
               klass = queryRunner.manager.create(Class, {
                 tenant_id: tenantId,
@@ -272,38 +278,42 @@ export class BulkImportService {
               klass = await queryRunner.manager.save(Class, klass);
               createdClasses.add(sanitizedClassName);
             }
-            classCache.set(classKey, klass);
+            classCache.set(normalizedClassName, klass);
           }
           usedClasses.add(sanitizedClassName);
 
-          // Step 1b: Find or create section
-          const sectionKey = `${klass.id}:${sanitizedSectionName}`;
-          let section = sectionCache.get(sectionKey);
-          if (!section) {
-            section = await queryRunner.manager.findOne(Section, {
-              where: {
-                tenant_id: tenantId,
-                class_id: klass.id,
-                name: sanitizedSectionName,
-              },
-            }) ?? undefined;
+          // Step 1b: Find or create section by normalized name (if provided)
+          let section: Section | undefined = undefined;
+          if (sanitizedSectionName) {
+            const sectionKey = `${klass.id}:${normalizedSectionName}`;
+            section = sectionCache.get(sectionKey);
             if (!section) {
-              section = queryRunner.manager.create(Section, {
-                tenant_id: tenantId,
-                class_id: klass.id,
-                name: sanitizedSectionName,
-              });
-              section = await queryRunner.manager.save(Section, section);
-              createdSections.add(`${sanitizedClassName}-${sanitizedSectionName}`);
+              const allSections = await queryRunner.manager.find(Section, { where: { tenant_id: tenantId, class_id: klass.id } });
+              section = allSections.find(
+                (s) => normalize(s.name) === normalizedSectionName,
+              );
+              if (!section) {
+                section = queryRunner.manager.create(Section, {
+                  tenant_id: tenantId,
+                  class_id: klass.id,
+                  name: sanitizedSectionName,
+                });
+                section = await queryRunner.manager.save(Section, section);
+                createdSections.add(
+                  `${sanitizedClassName}-${sanitizedSectionName}`,
+                );
+              }
+              sectionCache.set(sectionKey, section);
             }
-            sectionCache.set(sectionKey, section);
+            usedSections.add(`${sanitizedClassName}-${sanitizedSectionName}`);
           }
-          usedSections.add(`${sanitizedClassName}-${sanitizedSectionName}`);
 
           // Step 1c: Upsert student by identity
           const matchFirstName = row.first_name.trim().toUpperCase();
           const matchLastName = row.last_name.trim().toUpperCase();
           const matchDob = parseDate(row.dob);
+          const displayFirstName = toTitleCase(row.first_name);
+          const displayLastName = toTitleCase(row.last_name);
           let savedStudent = await queryRunner.manager.findOne(Student, {
             where: {
               tenant_id: tenantId,
@@ -312,21 +322,19 @@ export class BulkImportService {
               date_of_birth: matchDob,
             },
           });
-          let isUpdate = false;
           if (savedStudent) {
             // Update student fields if changed
-            isUpdate = true;
             savedStudent.gender = row.gender;
-            savedStudent.first_name = row.first_name;
-            savedStudent.last_name = row.last_name;
+            savedStudent.first_name = displayFirstName;
+            savedStudent.last_name = displayLastName;
             await queryRunner.manager.save(Student, savedStudent);
             studentsUpdatedCount++;
           } else {
             // Create new student
             const student = this.studentRepo.create({
               tenant_id: tenantId,
-              first_name: matchFirstName,
-              last_name: matchLastName,
+              first_name: displayFirstName,
+              last_name: displayLastName,
               date_of_birth: matchDob,
               gender: row.gender,
               admission_date: new Date(),
@@ -347,7 +355,7 @@ export class BulkImportService {
           if (enrollment) {
             // Update class/section if changed
             enrollment.class_id = klass.id;
-            enrollment.section_id = section.id;
+            enrollment.section_id = section?.id ?? null;
             enrollment.status = 'active';
             await queryRunner.manager.save(Enrollment, enrollment);
           } else {
@@ -355,7 +363,7 @@ export class BulkImportService {
               tenant_id: tenantId,
               student_id: savedStudent.id,
               class_id: klass.id,
-              section_id: section.id,
+              section_id: section?.id ?? null,
               academic_year_id: activeAcademicYear.id,
               roll_number: '',
               status: 'active',
@@ -370,7 +378,7 @@ export class BulkImportService {
           const yyyy = now.getFullYear();
           const mm = String(now.getMonth() + 1).padStart(2, '0');
           const monthStart = `${yyyy}-${mm}-01`;
-          const monthEnd = new Date(yyyy, now.getMonth() + 1, 0); // last day of month
+          // const monthEnd = new Date(yyyy, now.getMonth() + 1, 0); // last day of month
           // Find fee structure for this class/section/academic year (simplified: first match)
           const feeStructure = await queryRunner.manager.findOne(FeeStructure, {
             where: {
@@ -423,16 +431,29 @@ export class BulkImportService {
           // Step 3: Handle Father
           if (row.father_email && parentRole) {
             const result = await this.findOrCreateParent(
-              queryRunner, tenantId, row.father_email,
+              queryRunner,
+              tenantId,
+              row.father_email,
               row.father_name || `${row.last_name} (Father)`,
-              row.father_phone, defaultPasswordHash, parentRole.id, parentUserCache,
+              row.father_phone,
+              defaultPasswordHash,
+              parentRole.id,
+              parentUserCache,
             );
             if (result.created) {
               parentsCreated++;
-              welcomeEmails.push({ email: row.father_email, studentName: studentLabel, tempPassword: 'Welcome@Scholaro2026' });
+              welcomeEmails.push({
+                email: row.father_email,
+                studentName: studentLabel,
+                tempPassword: 'Welcome@Scholaro2026',
+              });
             }
             await this.linkParentIfNew(
-              queryRunner, tenantId, result.user.id, savedStudent.id!, 'father',
+              queryRunner,
+              tenantId,
+              result.user.id,
+              savedStudent.id!,
+              'father',
             );
             parentsLinked++;
           }
@@ -440,16 +461,29 @@ export class BulkImportService {
           // Step 4: Handle Mother (same logic as father)
           if (row.mother_email && parentRole) {
             const result = await this.findOrCreateParent(
-              queryRunner, tenantId, row.mother_email,
+              queryRunner,
+              tenantId,
+              row.mother_email,
               row.mother_name || `${row.last_name} (Mother)`,
-              row.mother_phone, defaultPasswordHash, parentRole.id, parentUserCache,
+              row.mother_phone,
+              defaultPasswordHash,
+              parentRole.id,
+              parentUserCache,
             );
             if (result.created) {
               parentsCreated++;
-              welcomeEmails.push({ email: row.mother_email, studentName: studentLabel, tempPassword: 'Welcome@Scholaro2026' });
+              welcomeEmails.push({
+                email: row.mother_email,
+                studentName: studentLabel,
+                tempPassword: 'Welcome@Scholaro2026',
+              });
             }
             await this.linkParentIfNew(
-              queryRunner, tenantId, result.user.id, savedStudent.id!, 'mother',
+              queryRunner,
+              tenantId,
+              result.user.id,
+              savedStudent.id!,
+              'mother',
             );
             parentsLinked++;
           }
@@ -463,7 +497,7 @@ export class BulkImportService {
           errors.push({
             row: rowNumber,
             student: studentLabel,
-            error: rowErr.message || 'Unknown error',
+            error: (rowErr as Error)?.message || 'Unknown error',
           });
         }
       }
@@ -471,22 +505,35 @@ export class BulkImportService {
       await queryRunner.commitTransaction();
 
       // Send welcome emails after successful commit (rate-limited, fire-and-forget)
-      const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-      (async () => {
+      const delay = (ms: number) =>
+        new Promise((resolve) => setTimeout(resolve, ms));
+      void (async () => {
         for (const we of welcomeEmails) {
-          this.mailService.sendWelcomeEmail(we.email, we.studentName, schoolName, we.tempPassword, schoolCode);
+          await this.mailService.sendWelcomeEmail(
+            we.email,
+            we.studentName,
+            schoolName,
+            we.tempPassword,
+            schoolCode,
+          );
           await delay(600); // ~1.6 emails/sec to stay under Resend's 2/sec limit
         }
       })();
 
       const failureCount = skipped;
       const parts = [`Imported ${imported} students`];
-      if (studentsUpdatedCount) parts.push(`updated ${studentsUpdatedCount} students`);
-      if (createdClasses.size) parts.push(`created ${createdClasses.size} new classes`);
-      if (createdSections.size) parts.push(`created ${createdSections.size} new sections`);
-      if (parentsCreated) parts.push(`created ${parentsCreated} parent accounts`);
-      if (parentsLinked) parts.push(`linked ${parentsLinked} parent-student relationships`);
-      if (failureCount) parts.push(`${failureCount} rows failed`);
+      if (studentsUpdatedCount)
+        parts.push(`updated ${studentsUpdatedCount} students`);
+      if (createdClasses.size)
+        parts.push(`created ${createdClasses.size} new classes`);
+      if (createdSections.size)
+        parts.push(`created ${createdSections.size} new sections`);
+      if (parentsCreated)
+        parts.push(`created ${parentsCreated} parent accounts`);
+      if (parentsLinked)
+        parts.push(`linked ${parentsLinked} parent-student relationships`);
+      if (failureCount)
+        parts.push(`${failureCount} rows failed`);
 
       console.log(`[BulkImport] COMPLETE — ${parts.join(', ')}. Classes used: [${[...usedClasses].join(', ')}], Sections used: [${[...usedSections].join(', ')}]`);
 

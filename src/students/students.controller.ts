@@ -1,3 +1,4 @@
+// ...existing code...
 import {
   Controller,
   Post,
@@ -84,7 +85,10 @@ export class StudentsController {
   ) {
     if (!tenantId) throw new BadRequestException('Missing x-tenant-id header');
     return this.studentsService.linkParentToStudent(
-      studentId, body.parent_user_id, body.relationship, tenantId,
+      studentId,
+      body.parent_user_id,
+      body.relationship,
+      tenantId,
     );
   }
 
@@ -92,10 +96,25 @@ export class StudentsController {
   @Roles('SCHOOL_ADMIN')
   async createAndLinkParent(
     @Param('id') studentId: string,
-    @Body() body: { name: string; email: string; phone?: string; relationship: string },
+    @Body()
+    body: { name: string; email: string; phone?: string; relationship: string },
     @Headers('x-tenant-id') tenantId: string,
   ) {
     if (!tenantId) throw new BadRequestException('Missing x-tenant-id header');
     return this.studentsService.createAndLinkParent(studentId, body, tenantId);
+  }
+
+  @Get('by-class/:classId')
+  async getStudentsByClass(
+    @Param('classId') classId: string,
+    @Query('sectionId') sectionId: string | undefined,
+    @Headers('x-tenant-id') tenantId: string,
+  ) {
+    if (!tenantId) throw new BadRequestException('Missing x-tenant-id header');
+    return this.studentsService.getStudentsByClass(
+      classId,
+      sectionId,
+      tenantId,
+    );
   }
 }

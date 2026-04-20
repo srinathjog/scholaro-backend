@@ -40,6 +40,9 @@ export class Activity {
   @Column({ type: 'varchar', length: 50 })
   activity_type!: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  student_id!: string | null;
+
   @Column({ type: 'uuid', nullable: false })
   created_by!: string;
 

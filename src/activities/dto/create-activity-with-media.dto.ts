@@ -38,4 +38,8 @@ export class CreateActivityWithMediaDto {
   @IsArray()
   @IsString({ each: true })
   media_urls?: string[];
+
+  @IsOptional()
+  @IsUUID()
+  student_id?: string;
 }
