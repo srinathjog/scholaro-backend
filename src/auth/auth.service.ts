@@ -121,6 +121,7 @@ export class AuthService {
     // Create JWT payload
     const payload = {
       userId: user.id,
+      email: user.email,
       tenantId: user.tenant_id,
       roles: roleNames,
       isFirstLogin: user.is_first_login,
