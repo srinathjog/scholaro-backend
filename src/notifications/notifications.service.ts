@@ -129,8 +129,8 @@ export class NotificationsService {
           );
           this.logger.log(`Push sent to ${sub.endpoint.slice(0, 50)}...`);
         } catch (err: any) {
-          if (err.statusCode === 404 || err.statusCode === 410) {
-            // Subscription expired — mark for cleanup
+          if (err.statusCode === 404 || err.statusCode === 410 || err.statusCode === 400 || err.statusCode === 403) {
+            // Subscription expired or invalid — mark for cleanup
             staleEndpoints.push(sub.endpoint);
             this.logger.warn(`Stale subscription (${err.statusCode}): ${sub.endpoint.slice(0, 50)}`);
           } else {
@@ -193,7 +193,7 @@ export class NotificationsService {
           );
           this.logger.log(`Class push sent to ${sub.endpoint.slice(0, 50)}...`);
         } catch (err: any) {
-          if (err.statusCode === 404 || err.statusCode === 410) {
+          if (err.statusCode === 404 || err.statusCode === 410 || err.statusCode === 400 || err.statusCode === 403) {
             staleEndpoints.push(sub.endpoint);
             this.logger.warn(`Stale subscription (${err.statusCode}): ${sub.endpoint.slice(0, 50)}`);
           } else {
@@ -239,7 +239,7 @@ export class NotificationsService {
         sent++;
         this.logger.log(`Test push delivered: ${sub.endpoint.slice(0, 50)}`);
       } catch (err: any) {
-        if (err.statusCode === 404 || err.statusCode === 410) {
+        if (err.statusCode === 404 || err.statusCode === 410 || err.statusCode === 400 || err.statusCode === 403) {
           stale++;
           await this.subscriptionRepo.delete({ endpoint: sub.endpoint });
           this.logger.warn(`Cleaned stale subscription: ${sub.endpoint.slice(0, 50)}`);
