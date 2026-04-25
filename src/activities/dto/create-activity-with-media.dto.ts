@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsArray,
+  ArrayMaxSize,
 } from 'class-validator';
 
 export class CreateActivityWithMediaDto {
@@ -36,8 +37,15 @@ export class CreateActivityWithMediaDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(20)
   @IsString({ each: true })
   media_urls?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  media_types?: string[];
 
   @IsOptional()
   @IsUUID()

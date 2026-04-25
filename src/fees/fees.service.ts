@@ -410,6 +410,62 @@ export class FeesService {
     };
   }
 
+  // ─── All Students Fees (for "Show Paid" toggle) ────────────────
+
+  async getAllStudentsFees(
+    tenantId: string,
+    classId: string,
+  ): Promise<{
+    count: number;
+    entries: {
+      enrollment_id: string;
+      student_name: string;
+      roll_number: string;
+      fees: Fee[];
+      total_due: number;
+      is_fully_paid: boolean;
+    }[];
+  }> {
+    const fees = await this.feeRepo
+      .createQueryBuilder('fee')
+      .innerJoinAndSelect('fee.enrollment', 'enrollment')
+      .innerJoinAndSelect('enrollment.student', 'student')
+      .where('fee.tenant_id = :tenantId', { tenantId })
+      .andWhere('enrollment.class_id = :classId', { classId })
+      .orderBy('student.first_name', 'ASC')
+      .addOrderBy('fee.due_date', 'ASC')
+      .getMany();
+
+    const grouped = new Map<
+      string,
+      { enrollment_id: string; student_name: string; roll_number: string; fees: Fee[]; total_due: number; is_fully_paid: boolean }
+    >();
+
+    for (const fee of fees) {
+      const eid = fee.enrollment_id;
+      if (!grouped.has(eid)) {
+        const student = fee.enrollment?.student;
+        grouped.set(eid, {
+          enrollment_id: eid,
+          student_name: student
+            ? `${student.first_name} ${student.last_name}`
+            : 'Unknown',
+          roll_number: fee.enrollment?.roll_number || '',
+          fees: [],
+          total_due: 0,
+          is_fully_paid: true,
+        });
+      }
+      const entry = grouped.get(eid)!;
+      entry.fees.push(fee);
+      entry.total_due += Number(fee.final_amount) - Number(fee.paid_amount);
+      if (fee.status !== 'paid') entry.is_fully_paid = false;
+    }
+
+    const entries = Array.from(grouped.values());
+    return { count: entries.length, entries };
+  }
+
   // ─── Get Fees for Enrollment ───────────────────────────────────
 
   async getFeesByEnrollment(

@@ -45,10 +45,10 @@ export class ActivitiesController {
   @UseInterceptors(
     FilesInterceptor('files', 10, {
       storage: memoryStorage(),
-      limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+      limits: { fileSize: 150 * 1024 * 1024 }, // 150 MB (covers large phone videos)
       fileFilter: (_req, file, cb) => {
-        if (!file.mimetype.startsWith('image/')) {
-          return cb(new BadRequestException('Only image files are allowed'), false);
+        if (!file.mimetype.startsWith('image/') && !file.mimetype.startsWith('video/')) {
+          return cb(new BadRequestException('Only image and video files are allowed'), false);
         }
         cb(null, true);
       },
@@ -63,14 +63,16 @@ export class ActivitiesController {
     }
 
     const tenantId = req.user.tenantId;
-    const urls = await Promise.all(
-      files.map((f) => {
+    const results = await Promise.all(
+      files.map(async (f) => {
         const safeName = f.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-        return this.storageService.upload(f.buffer, safeName, f.mimetype, tenantId);
+        const url = await this.storageService.upload(f.buffer, safeName, f.mimetype, tenantId);
+        const media_type = f.mimetype.startsWith('video/') ? 'video' : 'image';
+        return { url, media_type };
       }),
     );
 
-    return { urls };
+    return { files: results };
   }
 
   @UseGuards(JwtAuthGuard)

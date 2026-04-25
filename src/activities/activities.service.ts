@@ -45,12 +45,14 @@ export class ActivitiesService {
       // 2. Create the Child Media Records (Like a WhatsApp Gallery)
       let mediaRecords: ActivityMedia[] = [];
       if (dto.media_urls && dto.media_urls.length > 0) {
-        mediaRecords = dto.media_urls.map((url) => {
+        mediaRecords = dto.media_urls.map((url, i) => {
+          const media_type =
+            dto.media_types?.[i] === 'video' ? 'video' : 'image';
           return manager.create(ActivityMedia, {
             tenant_id: dto.tenant_id,
             activity: savedActivity,
             media_url: url,
-            media_type: 'image',
+            media_type,
           });
         });
 
