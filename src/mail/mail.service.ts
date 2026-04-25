@@ -12,6 +12,11 @@ export class MailService {
   private readonly from: string;
   private readonly templateCache = new Map<string, Handlebars.TemplateDelegate>();
 
+  // ── Rate-limit queue (Resend free tier: 2 req/s) ─────────────────────────
+  private readonly sendQueue: Array<() => Promise<void>> = [];
+  private draining = false;
+  private readonly SEND_INTERVAL_MS = 600; // ~1.6/s, safely under 2/s limit
+
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('RESEND_API_KEY')
       || this.configService.get<string>('MAIL_PASSWORD') || '';
@@ -44,13 +49,31 @@ export class MailService {
   }
 
   private async send(to: string, subject: string, html: string): Promise<void> {
-    const { error } = await this.resend.emails.send({
-      from: this.from,
-      to,
-      subject,
-      html,
+    return new Promise<void>((resolve, reject) => {
+      this.sendQueue.push(async () => {
+        const { error } = await this.resend.emails.send({
+          from: this.from,
+          to,
+          subject,
+          html,
+        });
+        if (error) reject(new Error(error.message));
+        else resolve();
+      });
+      this.drainQueue();
     });
-    if (error) throw new Error(error.message);
+  }
+
+  private drainQueue(): void {
+    if (this.draining) return;
+    this.draining = true;
+    const tick = async () => {
+      const job = this.sendQueue.shift();
+      if (!job) { this.draining = false; return; }
+      try { await job(); } catch { /* caller already handles via reject */ }
+      setTimeout(tick, this.SEND_INTERVAL_MS);
+    };
+    void tick();
   }
 
   async sendWelcomeEmail(

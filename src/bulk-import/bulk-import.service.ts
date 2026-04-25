@@ -309,19 +309,19 @@ export class BulkImportService {
           }
 
           // Step 1c: Upsert student by identity
-          const matchFirstName = row.first_name.trim().toUpperCase();
-          const matchLastName = row.last_name.trim().toUpperCase();
-          const matchDob = parseDate(row.dob);
           const displayFirstName = toTitleCase(row.first_name);
           const displayLastName = toTitleCase(row.last_name);
-          let savedStudent = await queryRunner.manager.findOne(Student, {
-            where: {
-              tenant_id: tenantId,
-              first_name: matchFirstName,
-              last_name: matchLastName,
-              date_of_birth: matchDob,
-            },
-          });
+          const matchDob = parseDate(row.dob);
+
+          // Use ILIKE for case-insensitive name match so re-uploads never create duplicates
+          // regardless of what casing was used on the first import.
+          let savedStudent = await queryRunner.manager
+            .createQueryBuilder(Student, 's')
+            .where('s.tenant_id = :tenantId', { tenantId })
+            .andWhere('LOWER(s.first_name) = LOWER(:firstName)', { firstName: displayFirstName })
+            .andWhere('LOWER(s.last_name) = LOWER(:lastName)', { lastName: displayLastName })
+            .andWhere('s.date_of_birth = :dob', { dob: matchDob.toISOString().split('T')[0] })
+            .getOne();
           if (savedStudent) {
             // Update student fields if changed
             savedStudent.gender = row.gender;
@@ -671,12 +671,16 @@ export class BulkImportService {
       }
       await queryRunner.commitTransaction();
 
-      // Send welcome emails after successful commit (fire-and-forget)
-      for (const we of welcomeEmails) {
-        this.mailService.sendStaffWelcomeEmail(
-          we.email, we.name, 'Teacher', schoolName, schoolCode, 'Welcome@Scholaro2026',
-        );
-      }
+      // Send welcome emails after successful commit (rate-limited, fire-and-forget)
+      const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+      void (async () => {
+        for (const we of welcomeEmails) {
+          await this.mailService.sendStaffWelcomeEmail(
+            we.email, we.name, 'Teacher', schoolName, schoolCode, 'Welcome@Scholaro2026',
+          );
+          await delay(600); // ~1.6/s — stay under Resend free-tier 2/s limit
+        }
+      })();
 
       return { success: true, count: rows.length };
     } catch (err) {
