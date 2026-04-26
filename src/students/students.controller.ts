@@ -3,6 +3,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Param,
   Body,
   Query,
@@ -104,6 +105,16 @@ export class StudentsController {
     return this.studentsService.createAndLinkParent(studentId, body, tenantId);
   }
 
+  @Get('export/class/:classId')
+  @Roles('SCHOOL_ADMIN')
+  async exportClassBioData(
+    @Param('classId') classId: string,
+    @Headers('x-tenant-id') tenantId: string,
+  ) {
+    if (!tenantId) throw new BadRequestException('Missing x-tenant-id header');
+    return this.studentsService.exportClassBioData(classId, tenantId);
+  }
+
   @Get('by-class/:classId')
   async getStudentsByClass(
     @Param('classId') classId: string,
@@ -116,5 +127,19 @@ export class StudentsController {
       sectionId,
       tenantId,
     );
+  }
+
+  @Patch(':id/status')
+  @Roles('SCHOOL_ADMIN')
+  async setStudentStatus(
+    @Param('id') id: string,
+    @Body() body: { status: 'active' | 'inactive' },
+    @Headers('x-tenant-id') tenantId: string,
+  ) {
+    if (!tenantId) throw new BadRequestException('Missing x-tenant-id header');
+    if (!['active', 'inactive'].includes(body.status)) {
+      throw new BadRequestException('status must be active or inactive');
+    }
+    return this.studentsService.setStudentStatus(id, body.status, tenantId);
   }
 }

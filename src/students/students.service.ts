@@ -319,10 +319,74 @@ export class StudentsService {
            ${sectionFilter}
            AND e.status = 'active'
            AND s.tenant_id = $1
+           AND s.status != 'inactive'
          ORDER BY s.first_name ASC`,
         params,
       );
 
+    return rows;
+  }
+
+  async setStudentStatus(
+    id: string,
+    status: 'active' | 'inactive',
+    tenantId: string,
+  ): Promise<Student> {
+    const student = await this.studentRepository.findOne({
+      where: { id, tenant_id: tenantId },
+    });
+    if (!student) throw new BadRequestException('Student not found');
+    student.status = status;
+    return this.studentRepository.save(student);
+  }
+
+  /**
+   * Returns bio-data rows for all active students in a class,
+   * including academic year, section, and their first-ever joining class.
+   */
+  async exportClassBioData(classId: string, tenantId: string) {
+    const rows: Array<{
+      name: string;
+      date_of_birth: string;
+      gender: string;
+      status: string;
+      admission_date: string;
+      class_name: string;
+      section_name: string | null;
+      academic_year: string;
+      joining_class: string | null;
+    }> = await this.dataSource.query(
+      `SELECT
+         s.first_name || ' ' || s.last_name  AS name,
+         s.date_of_birth,
+         s.gender,
+         s.status,
+         s.admission_date,
+         c.name                              AS class_name,
+         sec.name                            AS section_name,
+         ay.year                             AS academic_year,
+         jc.name                             AS joining_class
+       FROM enrollments e
+       INNER JOIN students      s   ON s.id    = e.student_id
+       INNER JOIN classes       c   ON c.id    = e.class_id
+       LEFT  JOIN sections      sec ON sec.id  = e.section_id
+       INNER JOIN academic_years ay ON ay.id   = e.academic_year_id
+       LEFT  JOIN (
+         SELECT DISTINCT ON (fe.student_id)
+           fe.student_id,
+           jcl.name
+         FROM   enrollments fe
+         INNER  JOIN classes jcl ON jcl.id = fe.class_id
+         WHERE  fe.tenant_id = $1
+         ORDER  BY fe.student_id, fe.created_at ASC
+       ) jc ON jc.student_id = s.id
+       WHERE e.tenant_id = $1
+         AND e.class_id  = $2
+         AND e.status    = 'active'
+         AND s.tenant_id = $1
+       ORDER BY s.first_name ASC`,
+      [tenantId, classId],
+    );
     return rows;
   }
 }

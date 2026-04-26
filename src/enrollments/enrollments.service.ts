@@ -75,11 +75,13 @@ export class EnrollmentsService {
   }
 
   async getEnrollmentsByClass(classId: string, tenantId: string): Promise<Enrollment[]> {
-    return this.enrollmentRepository.find({
+    const enrollments = await this.enrollmentRepository.find({
       where: { class_id: classId, tenant_id: tenantId, status: 'active' },
       relations: ['student'],
       order: { roll_number: 'ASC' },
     });
+    // Exclude inactive students from teacher-facing views
+    return enrollments.filter(e => e.student?.status !== 'inactive');
   }
 
   async getSectionStudentCounts(tenantId: string): Promise<Array<{ section_id: string; count: number }>> {
