@@ -6,16 +6,20 @@ import * as webPush from 'web-push';
 import { PushSubscription } from './push-subscription.entity';
 import { SubscribePushDto } from './dto/subscribe-push.dto';
 import { ParentStudent } from '../parents/parent-student.entity';
+import { Tenant } from '../super-admin/tenant.entity';
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
+  private readonly schoolNameCache = new Map<string, string>();
 
   constructor(
     @InjectRepository(PushSubscription)
     private readonly subscriptionRepo: Repository<PushSubscription>,
     @InjectRepository(ParentStudent)
     private readonly parentStudentRepo: Repository<ParentStudent>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepo: Repository<Tenant>,
     private readonly configService: ConfigService,
   ) {
     const publicKey = this.configService.get<string>('VAPID_PUBLIC_KEY');
@@ -60,6 +64,16 @@ export class NotificationsService {
   /** Get the VAPID public key for frontend registration */
   getPublicKey(): string {
     return this.configService.get<string>('VAPID_PUBLIC_KEY') || '';
+  }
+
+  /** Look up school name by tenantId, with in-memory cache to avoid repeated DB queries */
+  private async resolveSchoolName(tenantId: string): Promise<string> {
+    const cached = this.schoolNameCache.get(tenantId);
+    if (cached) return cached;
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId }, select: ['name'] });
+    const name = tenant?.name || 'Scholaro';
+    this.schoolNameCache.set(tenantId, name);
+    return name;
   }
 
   /** Build a standardized push notification payload with badge, renotify, tag */
@@ -116,7 +130,11 @@ export class NotificationsService {
     if (!subscriptions.length) return;
 
     // 3. Send to each subscription (Angular NGSW format)
-    const pushPayload = this.buildPushPayload(payload);
+    const schoolName = await this.resolveSchoolName(tenantId);
+    const pushPayload = this.buildPushPayload({
+      ...payload,
+      title: `${schoolName}: ${payload.title}`,
+    });
 
     const staleEndpoints: string[] = [];
 
@@ -181,7 +199,11 @@ export class NotificationsService {
     });
     if (!subscriptions.length) return;
 
-    const pushPayload = this.buildPushPayload(payload);
+    const schoolName = await this.resolveSchoolName(tenantId);
+    const pushPayload = this.buildPushPayload({
+      ...payload,
+      title: `${schoolName}: ${payload.title}`,
+    });
 
     const staleEndpoints: string[] = [];
     await Promise.allSettled(
@@ -225,7 +247,7 @@ export class NotificationsService {
     }
 
     const payload = this.buildPushPayload({
-      title: '🔔 Scholaro Test',
+      title: `🔔 ${await this.resolveSchoolName(tenantId)}: Test Notification`,
       body: 'Push notifications are working! You will receive activity updates here.',
     });
 
