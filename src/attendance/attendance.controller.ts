@@ -64,6 +64,7 @@ export class AttendanceController {
   }
 
   @Get('student/:enrollmentId')
+  @Roles('TEACHER', 'SCHOOL_ADMIN', 'PARENT')
   async getAttendanceByStudent(
     @Param('enrollmentId') enrollmentId: string,
     @Req() req: Request,

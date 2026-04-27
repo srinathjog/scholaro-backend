@@ -26,6 +26,7 @@ import { SuperAdminModule } from './super-admin/super-admin.module';
 import { SettingsModule } from './settings/settings.module';
 import { MailModule } from './mail/mail.module';
 import { StorageModule } from './storage/storage.module';
+import { CalendarModule } from './calendar/calendar.module';
 
 @Module({
   imports: [
@@ -88,6 +89,7 @@ import { StorageModule } from './storage/storage.module';
     SettingsModule,
     MailModule,
     StorageModule,
+    CalendarModule,
   ],
   controllers: [AppController],
   providers: [

@@ -374,7 +374,7 @@ export class AttendanceService {
           return this.notificationsService.notifyParentsOfStudent(
             record.enrollment.student_id,
             tenantId,
-            { title: '🏫 Arrived Safely!', body: `${name} has arrived safely at school!` },
+            { title: '🏫 School Check-in', body: `${name} has reached school safely! 🏫` },
           );
         }),
     );

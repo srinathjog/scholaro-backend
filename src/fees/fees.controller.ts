@@ -129,6 +129,15 @@ export class FeesController {
     return this.feesService.getDefaultersList(tenantId, classId);
   }
 
+  @Get('all-students/:classId')
+  async getAllStudentsFees(
+    @Param('classId') classId: string,
+    @Req() req: Request,
+  ) {
+    const { tenantId } = req.user as UserJwt;
+    return this.feesService.getAllStudentsFees(tenantId, classId);
+  }
+
   @Get('summary/:classId')
   async getClassFeeSummary(
     @Param('classId') classId: string,

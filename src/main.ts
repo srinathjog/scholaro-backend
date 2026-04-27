@@ -34,9 +34,9 @@ async function bootstrap() {
     next();
   });
 
-  // Increase payload limits for large file uploads
-  app.use(json({ limit: '50mb' }));
-  app.use(urlencoded({ limit: '50mb', extended: true }));
+  // Increase payload limits for large file uploads (videos up to ~150 MB)
+  app.use(json({ limit: '150mb' }));
+  app.use(urlencoded({ limit: '150mb', extended: true }));
 
   app.enableCors({
     origin: [

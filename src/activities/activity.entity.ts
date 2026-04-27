@@ -43,6 +43,15 @@ export class Activity {
   @Column({ type: 'uuid', nullable: true })
   student_id!: string | null;
 
+  /**
+   * Array of student UUIDs this post is targeted at.
+   * NULL means the post is class-wide (visible to all parents in the class).
+   * Supersedes the single `student_id` field; `student_id` is kept for
+   * backward-compatibility with existing rows.
+   */
+  @Column({ type: 'jsonb', nullable: true, default: null })
+  student_ids!: string[] | null;
+
   @Column({ type: 'uuid', nullable: false })
   created_by!: string;
 

@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsArray,
+  ArrayMaxSize,
 } from 'class-validator';
 
 export class CreateActivityWithMediaDto {
@@ -36,10 +37,24 @@ export class CreateActivityWithMediaDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(20)
   @IsString({ each: true })
   media_urls?: string[];
 
   @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  media_types?: string[];
+
+  /** @deprecated use student_ids */
+  @IsOptional()
   @IsUUID()
   student_id?: string;
+
+  /** Target specific students. Empty array or omitted = class-wide post. */
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  student_ids?: string[];
 }

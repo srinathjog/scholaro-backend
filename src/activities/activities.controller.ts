@@ -45,10 +45,10 @@ export class ActivitiesController {
   @UseInterceptors(
     FilesInterceptor('files', 10, {
       storage: memoryStorage(),
-      limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+      limits: { fileSize: 150 * 1024 * 1024 }, // 150 MB (covers large phone videos)
       fileFilter: (_req, file, cb) => {
-        if (!file.mimetype.startsWith('image/')) {
-          return cb(new BadRequestException('Only image files are allowed'), false);
+        if (!file.mimetype.startsWith('image/') && !file.mimetype.startsWith('video/')) {
+          return cb(new BadRequestException('Only image and video files are allowed'), false);
         }
         cb(null, true);
       },
@@ -63,14 +63,16 @@ export class ActivitiesController {
     }
 
     const tenantId = req.user.tenantId;
-    const urls = await Promise.all(
-      files.map((f) => {
+    const results = await Promise.all(
+      files.map(async (f) => {
         const safeName = f.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-        return this.storageService.upload(f.buffer, safeName, f.mimetype, tenantId);
+        const url = await this.storageService.upload(f.buffer, safeName, f.mimetype, tenantId);
+        const media_type = f.mimetype.startsWith('video/') ? 'video' : 'image';
+        return { url, media_type };
       }),
     );
 
-    return { urls };
+    return { files: results };
   }
 
   @UseGuards(JwtAuthGuard)
@@ -90,6 +92,7 @@ export class ActivitiesController {
   async getFeed(
     @Query('class_id') classId: string,
     @Query('enrollment_id') enrollmentId: string | undefined,
+    @Query('date') date: string | undefined,
     @Query('page') page: string | undefined,
     @Query('limit') limit: string | undefined,
     @Req() req: AuthRequest,
@@ -114,7 +117,28 @@ export class ActivitiesController {
     }
     const p = Math.max(1, parseInt(page || '1', 10) || 1);
     const l = Math.min(50, Math.max(1, parseInt(limit || '10', 10) || 10));
-    return this.activitiesService.getFeed(req.user.tenantId, classId, enrollmentId, p, l);
+    return this.activitiesService.getFeed(req.user.tenantId, classId, enrollmentId, p, l, date);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('admin-feed')
+  @Roles('SCHOOL_ADMIN')
+  async getAdminFeed(
+    @Query('teacher_id') teacherId: string | undefined,
+    @Query('class_id') classId: string | undefined,
+    @Query('page') page: string | undefined,
+    @Query('limit') limit: string | undefined,
+    @Req() req: AuthRequest,
+  ) {
+    const p = Math.max(1, parseInt(page || '1', 10) || 1);
+    const l = Math.min(50, Math.max(1, parseInt(limit || '20', 10) || 20));
+    return this.activitiesService.getAdminFeed(
+      req.user.tenantId,
+      teacherId,
+      classId,
+      p,
+      l,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
