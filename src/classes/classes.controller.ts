@@ -2,32 +2,48 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Body,
   Req,
+  Param,
+  Headers,
   BadRequestException,
   UseGuards,
 } from '@nestjs/common';
 import { ClassesService } from './classes.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 import type { Request } from 'express';
 
 @Controller('classes')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class ClassesController {
   constructor(private readonly classesService: ClassesService) {}
 
   @Post()
-  async create(@Body() dto: CreateClassDto, @Req() req: Request) {
-    const tenantId = (req['tenantId'] as string) || (req as any).user?.tenantId;
-    if (!tenantId) throw new BadRequestException('Missing tenantId');
+  @Roles('SCHOOL_ADMIN')
+  async create(@Headers('x-tenant-id') tenantId: string, @Body() dto: CreateClassDto) {
+    if (!tenantId) throw new BadRequestException('Missing x-tenant-id header');
     return this.classesService.createClass(dto, tenantId);
   }
 
   @Get()
-  async findAll(@Req() req: Request) {
-    const tenantId = (req['tenantId'] as string) || (req as any).user?.tenantId;
-    if (!tenantId) throw new BadRequestException('Missing tenantId');
+  @Roles('SCHOOL_ADMIN', 'TEACHER')
+  async findAll(@Headers('x-tenant-id') tenantId: string) {
+    if (!tenantId) throw new BadRequestException('Missing x-tenant-id header');
     return this.classesService.getAllClasses(tenantId);
+  }
+
+  @Delete(':id')
+  @Roles('SCHOOL_ADMIN')
+  async deleteClass(
+    @Param('id') id: string,
+    @Headers('x-tenant-id') tenantId: string,
+  ) {
+    if (!tenantId) throw new BadRequestException('Missing x-tenant-id header');
+    await this.classesService.deleteClass(id, tenantId);
+    return { success: true };
   }
 }
