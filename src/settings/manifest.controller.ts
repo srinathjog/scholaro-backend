@@ -18,9 +18,13 @@ export class ManifestController {
 
   @Get('info/:code')
   async getInfo(@Param('code') code: string) {
-    const tenant = await this.tenantRepo.findOne({
-      where: { tenant_code: code.toUpperCase() },
-    });
+    // Accept either a tenant UUID or a human-readable tenant_code
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code);
+    const tenant = await this.tenantRepo.findOne(
+      isUuid
+        ? { where: { id: code } }
+        : { where: { tenant_code: code.toUpperCase() } },
+    );
 
     if (!tenant) {
       throw new NotFoundException(`School not found for code: ${code}`);

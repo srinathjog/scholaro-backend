@@ -27,6 +27,7 @@ import { SettingsModule } from './settings/settings.module';
 import { MailModule } from './mail/mail.module';
 import { StorageModule } from './storage/storage.module';
 import { CalendarModule } from './calendar/calendar.module';
+import { LeadsModule } from './leads/leads.module';
 
 @Module({
   imports: [
@@ -90,6 +91,7 @@ import { CalendarModule } from './calendar/calendar.module';
     MailModule,
     StorageModule,
     CalendarModule,
+    LeadsModule,
   ],
   controllers: [AppController],
   providers: [
