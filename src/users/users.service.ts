@@ -37,6 +37,29 @@ export class UsersService {
     );
   }
 
+  async removeStaff(userId: string, tenantId: string): Promise<void> {
+    const rows = await this.dataSource.query(
+      `SELECT id FROM users WHERE id = $1 AND tenant_id = $2`,
+      [userId, tenantId],
+    );
+    if (!rows.length) throw new NotFoundException('Staff member not found');
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        `DELETE FROM teachers WHERE user_id = $1 AND tenant_id = $2`,
+        [userId, tenantId],
+      );
+      await manager.query(
+        `DELETE FROM user_roles WHERE user_id = $1 AND tenant_id = $2`,
+        [userId, tenantId],
+      );
+      await manager.query(
+        `DELETE FROM users WHERE id = $1 AND tenant_id = $2`,
+        [userId, tenantId],
+      );
+    });
+  }
+
   async assignRole(userId: string, roleName: string, tenantId: string) {
     // Find role
     const role = await this.roleRepo.findOne({ where: { name: roleName } });

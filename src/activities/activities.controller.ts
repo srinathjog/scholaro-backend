@@ -116,7 +116,7 @@ export class ActivitiesController {
       }
     }
     const p = Math.max(1, parseInt(page || '1', 10) || 1);
-    const l = Math.min(50, Math.max(1, parseInt(limit || '10', 10) || 10));
+    const l = Math.min(50, Math.max(1, parseInt(limit || '15', 10) || 15));
     return this.activitiesService.getFeed(req.user.tenantId, classId, enrollmentId, p, l, date);
   }
 

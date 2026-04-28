@@ -47,10 +47,10 @@ import { CalendarModule } from './calendar/calendar.module';
             autoLoadEntities: true,
             synchronize: false,
             extra: {
-              max: 10,
-              idleTimeoutMillis: 30000,
+              max: 4,
+              idleTimeoutMillis: 10000,
               connectionTimeoutMillis: 5000,
-              keepAlive: true,
+              keepAlive: false,
             },
             retryAttempts: 5,
             retryDelay: 3000,

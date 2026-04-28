@@ -93,13 +93,10 @@ export class ActivitiesService {
     classId: string,
     enrollmentId?: string,
     page = 1,
-    limit = 10,
+    limit = 15,
     date?: string,
   ) {
     const skip = (page - 1) * limit;
-
-    // Resolve the target date in IST. Falls back to today-in-IST if not supplied.
-    const targetDate = date || todayIST(); // YYYY-MM-DD
 
     // Build base query
     const qb = this.activityRepo
@@ -108,14 +105,18 @@ export class ActivitiesService {
       .leftJoinAndSelect('activity.assignedClass', 'assignedClass')
       .where('activity.tenant_id = :tenantId', { tenantId })
       .andWhere('activity.class_id = :classId', { classId })
-      // Filter by IST calendar date — converts UTC stored timestamp to IST before comparing
-      .andWhere(
-        `DATE(activity.created_at AT TIME ZONE 'Asia/Kolkata') = :targetDate`,
-        { targetDate },
-      )
       .orderBy('activity.created_at', 'DESC')
       .take(limit)
       .skip(skip);
+
+    // Date filter is opt-in: only apply when the caller explicitly passes a date.
+    // Without it, all posts scroll through newest-first (infinite scroll mode).
+    if (date) {
+      qb.andWhere(
+        `DATE(activity.created_at AT TIME ZONE 'Asia/Kolkata') = :targetDate`,
+        { targetDate: date },
+      );
+    }
 
     // When a specific child's enrollment is provided (parent feed),
     // filter so only class-wide posts OR posts targeting this child are shown.
