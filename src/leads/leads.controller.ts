@@ -23,7 +23,7 @@ import { Roles } from '../auth/roles.decorator';
 class PublicSubmitDto extends CreateLeadDto {
   @IsNotEmpty()
   @IsString()
-  @MaxLength(20)
+  @MaxLength(36) // accommodates both short codes (≤20) and full UUIDs (36 chars)
   tenant_code!: string;
 }
 
