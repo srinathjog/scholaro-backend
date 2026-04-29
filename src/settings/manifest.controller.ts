@@ -36,6 +36,7 @@ export class ManifestController {
 
     return {
       name: tenant.name,
+      tenant_code: tenant.tenant_code || null,
       logo_url: settings?.logo_url || null,
     };
   }
