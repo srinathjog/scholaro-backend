@@ -54,6 +54,7 @@ export class EnrollmentsService {
       );
     }
     const enrollment = this.enrollmentRepository.create({
+      roll_number: '',
       ...createEnrollmentDto,
       tenant_id: tenantId,
     });
@@ -91,7 +92,23 @@ export class EnrollmentsService {
       .addSelect('COUNT(*)::int', 'count')
       .where('e.tenant_id = :tenantId', { tenantId })
       .andWhere('e.status = :status', { status: 'active' })
+      .andWhere('e.section_id IS NOT NULL')
       .groupBy('e.section_id')
+      .getRawMany();
+    return result;
+  }
+
+  /** Count ALL active students per class (including those with no section). */
+  async getClassStudentCounts(
+    tenantId: string,
+  ): Promise<Array<{ class_id: string; count: number }>> {
+    const result = await this.enrollmentRepository
+      .createQueryBuilder('e')
+      .select('e.class_id', 'class_id')
+      .addSelect('COUNT(*)::int', 'count')
+      .where('e.tenant_id = :tenantId', { tenantId })
+      .andWhere('e.status = :status', { status: 'active' })
+      .groupBy('e.class_id')
       .getRawMany();
     return result;
   }

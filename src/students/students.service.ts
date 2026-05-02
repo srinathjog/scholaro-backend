@@ -41,8 +41,38 @@ export class StudentsService {
     createStudentDto: CreateStudentDto,
     tenantId: string,
   ): Promise<Student> {
+    const { class_id, academic_year_id, section_id, ...studentFields } = createStudentDto;
+
+    if (class_id && academic_year_id) {
+      // Capture narrowed values so TypeScript doesn't lose the type inside the async callback
+      const resolvedClassId = class_id;
+      const resolvedYearId = academic_year_id;
+      const resolvedSectionId = section_id ?? null;
+
+      return this.dataSource.transaction(async (manager) => {
+        const student = manager.create(Student, {
+          ...studentFields,
+          tenant_id: tenantId,
+        });
+        const saved = await manager.save(Student, student);
+
+        const enrollment = manager.create(Enrollment, {
+          student_id: saved.id,
+          class_id: resolvedClassId,
+          academic_year_id: resolvedYearId,
+          section_id: resolvedSectionId,
+          roll_number: '',
+          status: 'active',
+          tenant_id: tenantId,
+        });
+        await manager.save(Enrollment, enrollment);
+
+        return saved;
+      });
+    }
+
     const student = this.studentRepository.create({
-      ...createStudentDto,
+      ...studentFields,
       tenant_id: tenantId,
     });
     return this.studentRepository.save(student);

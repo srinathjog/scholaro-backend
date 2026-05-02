@@ -1,4 +1,4 @@
-import { IsUUID, IsDateString, IsIn } from 'class-validator';
+import { IsUUID, IsDateString, IsIn, IsOptional, IsBoolean } from 'class-validator';
 
 export class MarkAttendanceDto {
   @IsUUID()
@@ -9,4 +9,8 @@ export class MarkAttendanceDto {
 
   @IsIn(['present', 'absent', 'late', 'leave'])
   status!: 'present' | 'absent' | 'late' | 'leave';
+
+  @IsOptional()
+  @IsBoolean()
+  sendNotification?: boolean;
 }
