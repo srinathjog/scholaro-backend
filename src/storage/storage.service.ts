@@ -31,6 +31,7 @@ export class StorageService {
       .upload(path, buffer, {
         contentType,
         upsert: false,
+        cacheControl: '3600',
       });
 
     if (error) {

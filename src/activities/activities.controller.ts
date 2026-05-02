@@ -63,14 +63,23 @@ export class ActivitiesController {
     }
 
     const tenantId = req.user.tenantId;
-    const results = await Promise.all(
-      files.map(async (f) => {
+    const results: { url: string; media_type: string }[] = [];
+
+    // Sequential loop — upload one file at a time to avoid choking the connection
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      console.log(`[Upload] Uploading file ${i + 1} of ${files.length}: ${f.originalname}`);
+      try {
         const safeName = f.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
         const url = await this.storageService.upload(f.buffer, safeName, f.mimetype, tenantId);
         const media_type = f.mimetype.startsWith('video/') ? 'video' : 'image';
-        return { url, media_type };
-      }),
-    );
+        results.push({ url, media_type });
+        console.log(`[Upload] Done ${i + 1} of ${files.length}: ${f.originalname}`);
+      } catch (err: any) {
+        // Log and skip — don't crash the whole batch
+        console.error(`[Upload] Failed file ${i + 1} (${f.originalname}): ${err?.message}`);
+      }
+    }
 
     return { files: results };
   }
