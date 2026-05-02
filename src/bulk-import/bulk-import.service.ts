@@ -118,17 +118,18 @@ export class BulkImportService {
     /** Parse date string in DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, or MM/DD/YYYY formats */
     const parseDate = (raw: string): Date => {
       // Already YYYY-MM-DD
-      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return new Date(raw + 'T00:00:00');
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return new Date(raw + 'T00:00:00Z');
       // DD/MM/YYYY or DD-MM-YYYY
       const dmyMatch = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
       if (dmyMatch) {
         const [, d, m, y] = dmyMatch;
-        return new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T00:00:00`);
+        return new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T00:00:00Z`);
       }
-      // Fallback
-      const d = new Date(raw);
-      if (isNaN(d.getTime())) throw new Error(`Invalid date format: "${raw}". Use DD/MM/YYYY or YYYY-MM-DD.`);
-      return d;
+      // Fallback: parse and normalise to UTC midnight
+      const parsed = new Date(raw);
+      if (isNaN(parsed.getTime())) throw new Error(`Invalid date format: "${raw}". Use DD/MM/YYYY or YYYY-MM-DD.`);
+      // Strip time component — keep only the YYYY-MM-DD portion in UTC
+      return new Date(parsed.toISOString().split('T')[0] + 'T00:00:00Z');
     };
 
     const rows: Array<{ data: StudentRow; rowNumber: number }> = [];
@@ -200,6 +201,27 @@ export class BulkImportService {
       };
     }
 
+    // ── Deduplicate rows within the file itself ──────────────────────────────
+    // If the same student appears twice in the Excel, skip subsequent duplicates.
+    const seenInFile = new Set<string>();
+    const deduplicatedRows: typeof rows = [];
+    for (const r of rows) {
+      const normalize = (s: string) => s.trim().toLowerCase();
+      const key = `${normalize(r.data.first_name)}:${normalize(r.data.last_name)}:${r.data.dob.trim()}`;
+      if (seenInFile.has(key)) {
+        preErrors.push({
+          row: r.rowNumber,
+          student: `${r.data.first_name} ${r.data.last_name}`,
+          error: 'Duplicate row in file — same student already appears earlier in this upload.',
+        });
+      } else {
+        seenInFile.add(key);
+        deduplicatedRows.push(r);
+      }
+    }
+    rows.splice(0, rows.length, ...deduplicatedRows);
+    // ────────────────────────────────────────────────────────────────────────
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -259,7 +281,8 @@ export class BulkImportService {
         try {
           // Step 1: Normalize class and section names (ignore case and spaces)
           const normalize = (name: string) => name.trim().toLowerCase().replace(/\s/g, '');
-          const sanitizedClassName = row.class_name.trim();
+          const toTitleCase = (str: string) => str.trim().replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+          const sanitizedClassName = toTitleCase(row.class_name);
           const normalizedClassName = normalize(row.class_name);
           const sanitizedSectionName = row.section_name ? row.section_name.trim() : '';
           const normalizedSectionName = row.section_name ? normalize(row.section_name) : '';

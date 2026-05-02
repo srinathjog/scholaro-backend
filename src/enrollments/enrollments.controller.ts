@@ -66,6 +66,15 @@ export class EnrollmentsController {
     return this.enrollmentsService.getSectionStudentCounts(tenantId);
   }
 
+  @Get('class-counts')
+  async getClassStudentCounts(@Req() req: Request) {
+    const tenantId = (req['tenantId'] as string) || (req as any).user?.tenantId;
+    if (!tenantId) {
+      throw new BadRequestException('Missing tenantId in request');
+    }
+    return this.enrollmentsService.getClassStudentCounts(tenantId);
+  }
+
   @Get(':id')
   async getEnrollmentById(@Param('id') id: string, @Req() req: Request) {
     const tenantId = (req['tenantId'] as string) || (req as any).user?.tenantId;
