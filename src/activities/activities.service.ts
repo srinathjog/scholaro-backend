@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
 import { Activity } from './activity.entity';
@@ -28,6 +28,16 @@ export class ActivitiesService {
   ) {}
 
   async createActivity(dto: CreateActivityWithMediaDto) {
+    // Guard: photo/moment posts must include at least one uploaded URL
+    if (
+      (dto.activity_type === 'photo' || dto.activity_type === 'moment') &&
+      (!dto.media_urls || dto.media_urls.length === 0)
+    ) {
+      throw new BadRequestException(
+        'At least one photo is required for a photo/moment post.',
+      );
+    }
+
     // Normalise student targeting:
     // Prefer student_ids array; fall back to wrapping legacy student_id.
     const studentIds: string[] | null =
