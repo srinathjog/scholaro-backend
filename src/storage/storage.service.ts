@@ -24,7 +24,10 @@ export class StorageService {
     contentType: string,
     tenantId: string,
   ): Promise<string> {
-    const path = `${tenantId}/${Date.now()}_${filename}`;
+    const uniqueName = `activity_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const ext = filename.includes('.') ? filename.split('.').pop() : 'jpg';
+    const path = `${tenantId}/${uniqueName}.${ext}`;
+    console.log('Uploading file as:', path);
 
     const { error } = await this.supabase.storage
       .from(this.bucket)

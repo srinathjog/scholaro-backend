@@ -28,6 +28,7 @@ export class ActivitiesService {
   ) {}
 
   async createActivity(dto: CreateActivityWithMediaDto) {
+    console.log('Incoming Activity DTO:', JSON.stringify({ title: dto.title, activity_type: dto.activity_type, media_urls_count: dto.media_urls?.length ?? 0, class_id: dto.class_id }));
     // Guard: photo/moment posts must include at least one uploaded URL
     if (
       (dto.activity_type === 'photo' || dto.activity_type === 'moment') &&
