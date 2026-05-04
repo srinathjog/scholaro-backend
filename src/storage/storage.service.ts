@@ -15,6 +15,34 @@ export class StorageService {
   }
 
   /**
+   * Generate a Supabase signed upload URL for direct client-to-Supabase upload.
+   * The caller uploads the file bytes directly to the returned signedUrl via PUT.
+   * Returns the signed URL plus the final public URL the client should store.
+   */
+  async createSignedUploadUrl(
+    tenantId: string,
+    contentType: string,
+  ): Promise<{ signedUrl: string; path: string; publicUrl: string }> {
+    const ext = contentType.includes('video') ? 'mp4' : 'jpg';
+    const path = `${tenantId}/activity_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+
+    const { data, error } = await this.supabase.storage
+      .from(this.bucket)
+      .createSignedUploadUrl(path, { upsert: false });
+
+    if (error || !data?.signedUrl) {
+      this.logger.error(`Failed to create signed URL: ${error?.message}`);
+      throw new Error(`Could not generate upload URL: ${error?.message}`);
+    }
+
+    const { data: publicData } = this.supabase.storage
+      .from(this.bucket)
+      .getPublicUrl(path);
+
+    return { signedUrl: data.signedUrl, path, publicUrl: publicData.publicUrl };
+  }
+
+  /**
    * Upload a file buffer to Supabase Storage.
    * Returns the public URL of the uploaded file.
    */

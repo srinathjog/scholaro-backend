@@ -40,6 +40,25 @@ export class ActivitiesController {
   ) {}
 
   @UseGuards(JwtAuthGuard)
+  @Post('upload-urls')
+  @Roles('SCHOOL_ADMIN', 'TEACHER')
+  async getSignedUploadUrls(
+    @Body() body: { files: Array<{ contentType: string }> },
+    @Req() req: AuthRequest,
+  ) {
+    if (!body?.files?.length) {
+      throw new BadRequestException('files array is required');
+    }
+    const tenantId = req.user.tenantId;
+    const results = await Promise.all(
+      body.files.map(f =>
+        this.storageService.createSignedUploadUrl(tenantId, f.contentType),
+      ),
+    );
+    return { urls: results };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post('upload')
   @Roles('SCHOOL_ADMIN', 'TEACHER')
   @UseInterceptors(
@@ -185,7 +204,7 @@ export class ActivitiesController {
   @Roles('SCHOOL_ADMIN', 'TEACHER')
   async updateActivity(
     @Param('id') id: string,
-    @Body() updateDto: Partial<{ title: string; description: string; class_id: string; section_id: string }>,
+    @Body() updateDto: Partial<{ title: string; description: string; class_id: string; section_id: string; activity_type: string; media_urls: string[]; media_types: string[] }>,
     @Req() req: AuthRequest,
   ) {
     return this.activitiesService.updateActivity(id, req.user.tenantId, updateDto);

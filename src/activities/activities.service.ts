@@ -208,8 +208,20 @@ export class ActivitiesService {
     });
   }
 
-  // Update activity fields (title, description, class_id, section_id)
-  async updateActivity(id: string, tenantId: string, updateDto: Partial<{ title: string; description: string; class_id: string; section_id: string }>) {
+  // Update activity fields and optionally replace all media (wipe-and-replace)
+  async updateActivity(
+    id: string,
+    tenantId: string,
+    updateDto: Partial<{
+      title: string;
+      description: string;
+      class_id: string;
+      section_id: string;
+      activity_type: string;
+      media_urls: string[];
+      media_types: string[];
+    }>,
+  ) {
     const activity = await this.activityRepo.findOne({ where: { id, tenant_id: tenantId } });
     if (!activity) throw new Error('Activity not found or access denied');
 
@@ -217,8 +229,38 @@ export class ActivitiesService {
     if (updateDto.description !== undefined) activity.description = updateDto.description;
     if (updateDto.class_id !== undefined) activity.class_id = updateDto.class_id;
     if (updateDto.section_id !== undefined) activity.section_id = updateDto.section_id;
+    if (updateDto.activity_type !== undefined) activity.activity_type = updateDto.activity_type;
 
-    await this.activityRepo.save(activity);
+    if (updateDto.media_urls !== undefined) {
+      // Wipe-and-replace: delete all existing media records, insert the new list.
+      // This is the most reliable way to sync edits without complex diffing.
+      await this.dataSource.transaction(async (manager) => {
+        await manager.save(Activity, activity);
+
+        await manager
+          .createQueryBuilder()
+          .delete()
+          .from(ActivityMedia)
+          .where('activity_id = :id AND tenant_id = :tenantId', { id, tenantId })
+          .execute();
+
+        if (updateDto.media_urls!.length > 0) {
+          const mediaRecords = updateDto.media_urls!.map((url, i) => {
+            const media_type = updateDto.media_types?.[i] === 'video' ? 'video' : 'image';
+            return manager.create(ActivityMedia, {
+              tenant_id: tenantId,
+              activity,
+              media_url: url,
+              media_type,
+            });
+          });
+          await manager.save(ActivityMedia, mediaRecords);
+        }
+      });
+    } else {
+      await this.activityRepo.save(activity);
+    }
+
     return activity;
   }
 
