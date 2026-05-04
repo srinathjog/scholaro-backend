@@ -185,7 +185,7 @@ export class ActivitiesController {
   @Roles('SCHOOL_ADMIN', 'TEACHER')
   async updateActivity(
     @Param('id') id: string,
-    @Body() updateDto: Partial<{ title: string; description: string; class_id: string; section_id: string }>,
+    @Body() updateDto: Partial<{ title: string; description: string; class_id: string; section_id: string; activity_type: string; media_urls: string[]; media_types: string[] }>,
     @Req() req: AuthRequest,
   ) {
     return this.activitiesService.updateActivity(id, req.user.tenantId, updateDto);
