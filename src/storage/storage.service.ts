@@ -28,7 +28,7 @@ export class StorageService {
 
     const { data, error } = await this.supabase.storage
       .from(this.bucket)
-      .createSignedUploadUrl(path, { upsert: false });
+      .createSignedUploadUrl(path);
 
     if (error || !data?.signedUrl) {
       this.logger.error(`Failed to create signed URL: ${error?.message}`);
