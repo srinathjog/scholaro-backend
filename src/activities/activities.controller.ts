@@ -40,6 +40,25 @@ export class ActivitiesController {
   ) {}
 
   @UseGuards(JwtAuthGuard)
+  @Post('upload-urls')
+  @Roles('SCHOOL_ADMIN', 'TEACHER')
+  async getSignedUploadUrls(
+    @Body() body: { files: Array<{ contentType: string }> },
+    @Req() req: AuthRequest,
+  ) {
+    if (!body?.files?.length) {
+      throw new BadRequestException('files array is required');
+    }
+    const tenantId = req.user.tenantId;
+    const results = await Promise.all(
+      body.files.map(f =>
+        this.storageService.createSignedUploadUrl(tenantId, f.contentType),
+      ),
+    );
+    return { urls: results };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post('upload')
   @Roles('SCHOOL_ADMIN', 'TEACHER')
   @UseInterceptors(
