@@ -18,7 +18,8 @@ export class SchoolDocumentsService {
     file: Express.Multer.File,
   ): Promise<SchoolDocument> {
     const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const fileUrl = await this.storageService.upload(
+    // Use the school-documents bucket (no MIME restrictions) so PDFs are accepted.
+    const fileUrl = await this.storageService.uploadDocument(
       file.buffer,
       safeName,
       file.mimetype,
