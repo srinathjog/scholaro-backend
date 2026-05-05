@@ -99,6 +99,43 @@ export class AttendanceService {
     });
   }
 
+  /**
+   * Save a mixed-status batch in a single upsert.
+   * Used by the frontend "Save Attendance" button — 1 DB round-trip instead of N.
+   */
+  async saveMixed(
+    records: Array<{ enrollment_id: string; date: string; status: 'present' | 'absent' | 'late' | 'leave' }>,
+    tenantId: string,
+    userId: string,
+  ): Promise<Attendance[]> {
+    if (!records.length) return [];
+
+    const now = new Date();
+    const values = records.map(({ enrollment_id, date, status }) =>
+      this.attendanceRepository.create({
+        enrollment_id,
+        date,
+        status,
+        tenant_id: tenantId,
+        marked_by: userId,
+        check_in_time: (status === 'present' || status === 'late') ? now : undefined,
+      }),
+    );
+
+    await this.attendanceRepository
+      .createQueryBuilder()
+      .insert()
+      .values(values)
+      .orUpdate(['status', 'marked_by', 'check_in_time'], ['enrollment_id', 'date'])
+      .execute();
+
+    const enrollmentIds = records.map(r => r.enrollment_id);
+    const dates = [...new Set(records.map(r => r.date))];
+    return this.attendanceRepository.find({
+      where: { date: In(dates), tenant_id: tenantId, enrollment_id: In(enrollmentIds) },
+    });
+  }
+
   async getAttendanceByDate(date: string, tenantId: string) {
     return this.attendanceRepository.find({
       where: { date, tenant_id: tenantId },
