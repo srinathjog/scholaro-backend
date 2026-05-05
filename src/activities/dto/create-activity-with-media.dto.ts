@@ -37,13 +37,13 @@ export class CreateActivityWithMediaDto {
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(20)
+  @ArrayMaxSize(40)
   @IsString({ each: true })
   media_urls?: string[];
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(20)
+  @ArrayMaxSize(40)
   @IsString({ each: true })
   media_types?: string[];
 
