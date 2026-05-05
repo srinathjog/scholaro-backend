@@ -36,6 +36,16 @@ export class AttendanceController {
     return this.attendanceService.markAttendance(dto, tenantId, userId);
   }
 
+  @Post('save-all')
+  async saveAll(
+    @Body() body: { records: Array<{ enrollment_id: string; date: string; status: 'present' | 'absent' | 'late' | 'leave' }> },
+    @Req() req: Request,
+  ) {
+    if (!body.records?.length) return [];
+    const { tenantId, userId } = req.user as UserJwt;
+    return this.attendanceService.saveMixed(body.records, tenantId, userId);
+  }
+
   @Post('bulk')
   async markBulk(
     @Body() body: { enrollment_ids: string[]; date: string; status: 'present' | 'absent' | 'late' | 'leave' },
