@@ -333,7 +333,18 @@ export class AttendanceService {
     classId: string,
     month: number,
     year: number,
-  ): Promise<Array<{ studentName: string; totalDays: number; presentCount: number; absentCount: number; percentage: number }>> {
+  ): Promise<Array<{
+    studentName: string;
+    totalDays: number;
+    presentCount: number;
+    absentCount: number;
+    percentage: number;
+    joiningYear: string;
+    joiningClass: string;
+    parentName: string;
+    parentPhone: string;
+    parentEmail: string;
+  }>> {
     if (!month || !year || month < 1 || month > 12 || year < 1900) {
       throw new BadRequestException('Month and year must be valid values');
     }
@@ -349,6 +360,9 @@ export class AttendanceService {
     if (!enrollments.length) return [];
 
     const enrollmentIds = enrollments.map((enrollment) => enrollment.id);
+    const studentIds = enrollments.map((enrollment) => enrollment.student_id);
+
+    // Fetch attendance aggregates
     const attendanceRows = await this.attendanceRepository
       .createQueryBuilder('a')
       .select('a.enrollment_id', 'enrollmentId')
@@ -372,12 +386,57 @@ export class AttendanceService {
       ]),
     );
 
+    // Fetch parent info + class name via raw SQL join
+    let parentMap = new Map<string, { name: string; phone: string; email: string }>();
+    let classNameMap = new Map<string, string>();
+
+    if (studentIds.length > 0) {
+      const parentRows = await this.dataSource.query(
+        `SELECT ps.student_id, u.name, u.email, u.phone_number
+         FROM parent_students ps
+         JOIN users u ON u.id = ps.parent_user_id AND u.tenant_id = ps.tenant_id
+         WHERE ps.tenant_id = $1 AND ps.student_id = ANY($2::uuid[])`,
+        [tenantId, studentIds],
+      );
+      for (const r of parentRows) {
+        if (!parentMap.has(r.student_id)) {
+          parentMap.set(r.student_id, {
+            name: r.name || '',
+            phone: r.phone_number || '',
+            email: r.email || '',
+          });
+        }
+      }
+
+      // Fetch class names for the enrolled class_ids
+      const classIds = [...new Set(enrollments.map(e => e.class_id))];
+      if (classIds.length > 0) {
+        const classRows = await this.dataSource.query(
+          `SELECT id, name FROM classes WHERE tenant_id = $1 AND id = ANY($2::uuid[])`,
+          [tenantId, classIds],
+        );
+        for (const c of classRows) classNameMap.set(c.id, c.name);
+      }
+    }
+
+    // Fetch academic year info (joining year) per enrollment
+    const academicYearIds = [...new Set(enrollments.map(e => e.academic_year_id).filter(Boolean))];
+    let yearMap = new Map<string, string>();
+    if (academicYearIds.length > 0) {
+      const yearRows = await this.dataSource.query(
+        `SELECT id, name FROM academic_years WHERE tenant_id = $1 AND id = ANY($2::uuid[])`,
+        [tenantId, academicYearIds],
+      );
+      for (const y of yearRows) yearMap.set(y.id, y.name);
+    }
+
     return enrollments.map((enrollment) => {
       const student = enrollment.student;
       const studentName = [student.first_name, student.last_name].filter(Boolean).join(' ');
       const counts = attendanceMap.get(enrollment.id) ?? { presentCount: 0, absentCount: 0, leaveCount: 0 };
       const totalDays = counts.presentCount + counts.absentCount + counts.leaveCount;
       const percentage = totalDays ? Math.round((counts.presentCount / totalDays) * 100) : 0;
+      const parent = parentMap.get(enrollment.student_id) ?? { name: '', phone: '', email: '' };
 
       return {
         studentName,
@@ -385,6 +444,11 @@ export class AttendanceService {
         presentCount: counts.presentCount,
         absentCount: counts.absentCount,
         percentage,
+        joiningYear: yearMap.get(enrollment.academic_year_id) ?? '',
+        joiningClass: classNameMap.get(enrollment.class_id) ?? '',
+        parentName: parent.name,
+        parentPhone: parent.phone,
+        parentEmail: parent.email,
       };
     });
   }
