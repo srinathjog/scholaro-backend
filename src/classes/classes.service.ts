@@ -10,6 +10,7 @@ import { Class } from './class.entity';
 import { CreateClassDto } from './dto/create-class.dto';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { Section } from '../sections/section.entity';
+import { TeacherAssignment } from '../teacher-assignments/teacher-assignment.entity';
 
 @Injectable()
 export class ClassesService {
@@ -20,6 +21,8 @@ export class ClassesService {
     private readonly enrollmentRepository: Repository<Enrollment>,
     @InjectRepository(Section)
     private readonly sectionRepository: Repository<Section>,
+    @InjectRepository(TeacherAssignment)
+    private readonly assignmentRepository: Repository<TeacherAssignment>,
   ) {}
 
   /** Convert e.g. 'NURSERY' or 'nursery' → 'Nursery' */
@@ -111,6 +114,11 @@ export class ClassesService {
 
     // Remove all enrollments referencing this class (including orphan records)
     await this.enrollmentRepository.delete({
+      class_id: id,
+      tenant_id: tenantId,
+    });
+    // Delete teacher assignments for this class
+    await this.assignmentRepository.delete({
       class_id: id,
       tenant_id: tenantId,
     });

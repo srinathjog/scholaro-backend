@@ -49,12 +49,11 @@ import { SchoolDocumentsModule } from './school-documents/school-documents.modul
             autoLoadEntities: true,
             synchronize: false,
             extra: {
-              max: 20,
-              min: 2,
-              idleTimeoutMillis: 30000,
-              connectionTimeoutMillis: 20000,
-              keepAlive: true,
-              keepAliveInitialDelayMillis: 10000,
+              max: 10,
+              min: 0,             // never keep idle connections — prevents NAT/PgBouncer killing them silently
+              idleTimeoutMillis: 5000,  // release after 5s idle (before any NAT/firewall drops the TCP)
+              connectionTimeoutMillis: 30000,
+              keepAlive: false,   // irrelevant with PgBouncer transaction pooler; disabling avoids confusion
             },
             retryAttempts: 5,
             retryDelay: 3000,

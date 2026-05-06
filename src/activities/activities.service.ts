@@ -8,7 +8,7 @@ import { Enrollment } from '../enrollments/enrollment.entity';
 import { CreateActivityWithMediaDto } from './dto/create-activity-with-media.dto';
 import { User } from '../users/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
-import { todayIST, toISTDate } from '../utils/date.util';
+import { toISTDate } from '../utils/date.util';
 
 @Injectable()
 export class ActivitiesService {
@@ -87,12 +87,16 @@ export class ActivitiesService {
       return { ...savedActivity, media: mediaRecords };
     });
 
-    // Fire-and-forget: only push-notify parents of PRESENT students
+    // Fire-and-forget: notify all parents in the class about the new post.
+    // We use the class-wide approach so every parent sees activity posts
+    // regardless of whether their child attended today.
     if (dto.class_id) {
-      this.notifyPresentParents(dto.class_id, dto.tenant_id!, dto.title)
-        .catch((err: any) =>
-          this.logger.error(`Activity push failed: ${err.message}`),
-        );
+      this.notificationsService.notifyParentsOfClass(dto.class_id, dto.tenant_id!, {
+        title: '📸 New activity posted!',
+        body: dto.title || 'Check out the latest class update.',
+      }).catch((err: any) =>
+        this.logger.error(`Activity push failed: ${err.message}`),
+      );
     }
 
     return result;
@@ -368,66 +372,4 @@ export class ActivitiesService {
     };
   }
 
-  /**
-   * Silent Notification Rule:
-   * Only push-notify parents whose children are marked present/late today.
-   * If attendance hasn't been marked yet, fall back to notifying the entire class.
-   * Personalized: each parent gets their child's name in the notification.
-   */
-  private async notifyPresentParents(
-    classId: string,
-    tenantId: string,
-    title?: string,
-  ): Promise<void> {
-    const today = todayIST();
-
-    // Query today's attendance for this class, joined to enrollment + student for name
-    const records = await this.attendanceRepo
-      .createQueryBuilder('att')
-      .innerJoin('att.enrollment', 'enrollment')
-      .innerJoin('enrollment.student', 'student')
-      .where('att.tenant_id = :tenantId', { tenantId })
-      .andWhere('enrollment.class_id = :classId', { classId })
-      .andWhere('att.date = :today', { today })
-      .select([
-        'att.status',
-        'enrollment.student_id',
-        'student.first_name',
-      ])
-      .getRawMany();
-
-    // If no attendance marked yet, fall back to notifying all parents in the class
-    if (records.length === 0) {
-      await this.notificationsService.notifyParentsOfClass(classId, tenantId, {
-        title: '📸 New from class!',
-        body: title || 'New activity posted — check it out!',
-      });
-      return;
-    }
-
-    // Only notify parents of present / late students — personalized per child
-    const presentStudents = records
-      .filter((r: any) => r.att_status === 'present' || r.att_status === 'late')
-      .map((r: any) => ({
-        studentId: r.enrollment_student_id,
-        firstName: r.student_first_name,
-      }));
-
-    // Deduplicate by studentId
-    const seen = new Set<string>();
-    const unique = presentStudents.filter((s) => {
-      if (seen.has(s.studentId)) return false;
-      seen.add(s.studentId);
-      return true;
-    });
-
-    await Promise.allSettled(
-      unique.map((s) =>
-        this.notificationsService.notifyParentsOfStudent(s.studentId, tenantId, {
-          title: `📸 New photo of ${s.firstName} in class!`,
-          body: title || 'Check out the latest activity update!',
-        }),
-      ),
-    );
-  }
 }

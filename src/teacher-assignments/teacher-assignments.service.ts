@@ -76,10 +76,12 @@ export class TeacherAssignmentsService {
   }
 
   async getAssignmentsByTeacher(teacherId: string, tenantId: string) {
-    return this.assignmentRepo.find({
+    const assignments = await this.assignmentRepo.find({
       where: { teacher_id: teacherId, tenant_id: tenantId },
       relations: ['assignedClass', 'section'],
     });
+    // Filter out any assignments whose class was deleted (assignedClass will be null after JOIN)
+    return assignments.filter((a) => a.assignedClass != null);
   }
 
   async getAssignmentsByClass(classId: string, tenantId: string) {
