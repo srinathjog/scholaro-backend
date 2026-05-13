@@ -29,7 +29,7 @@ export class SchoolDocumentsController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+      limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
       fileFilter: (_req, file, cb) => {
         const allowed = [
           'application/pdf',
