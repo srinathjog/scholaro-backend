@@ -29,6 +29,7 @@ import { StorageModule } from './storage/storage.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { LeadsModule } from './leads/leads.module';
 import { SchoolDocumentsModule } from './school-documents/school-documents.module';
+import { ClassPlannersModule } from './planners/class-planners.module';
 
 @Module({
   imports: [
@@ -95,6 +96,7 @@ import { SchoolDocumentsModule } from './school-documents/school-documents.modul
     CalendarModule,
     LeadsModule,
     SchoolDocumentsModule,
+    ClassPlannersModule,
   ],
   controllers: [AppController],
   providers: [
