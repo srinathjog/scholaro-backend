@@ -100,11 +100,11 @@ export class ClassPlannersController {
   }
 
   /**
-   * Get all planners for a class (teacher's history view).
+   * Get all planners for a class (teacher's history view + parent syllabus archive).
    * Query param: class_id
    */
   @Get('history')
-  @Roles('TEACHER', 'SCHOOL_ADMIN')
+  @Roles('TEACHER', 'SCHOOL_ADMIN', 'PARENT')
   async findAllForClass(
     @Headers('x-tenant-id') tenantId: string,
     @Query('class_id') classId: string,
