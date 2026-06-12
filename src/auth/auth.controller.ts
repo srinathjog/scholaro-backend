@@ -36,6 +36,15 @@ export class AuthController {
     return this.authService.requestPasswordReset(email, tenantId, schoolCode);
   }
 
+  @Post('forgot-password/superadmin')
+  async forgotPasswordSuperAdmin(
+    @Body('email') email: string,
+    @Req() req: express.Request,
+  ) {
+    // Superadmin has no school_code, pass undefined
+    return this.authService.requestPasswordReset(email, '', undefined);
+  }
+
   @Post('reset-password')
   async resetPassword(
     @Body('token') token: string,
