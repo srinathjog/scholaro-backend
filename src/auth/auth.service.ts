@@ -177,6 +177,28 @@ export class AuthService {
     return { message: 'If that email exists, a reset link has been sent.' };
   }
 
+  async requestSuperadminPasswordReset(email: string) {
+    // Superadmin has no tenant context — search by email only
+    const user = await this.userRepository.findOne({ where: { email } });
+    if (!user) {
+      // Return success even if user not found to prevent email enumeration
+      return { message: 'If that email exists, a reset link has been sent.' };
+    }
+
+    // Generate a secure UUID as the reset token
+    const token = crypto.randomUUID();
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    user.reset_password_token = token;
+    user.reset_password_expires = expires;
+    await this.userRepository.save(user);
+
+    // Fire-and-forget — don't block request on email delivery
+    this.mailService.sendResetPasswordEmail(email, token, 'Scholaro Platform');
+
+    return { message: 'If that email exists, a reset link has been sent.' };
+  }
+
   async resetPassword(token: string, newPassword: string, tenantId: string, schoolCode?: string) {
     if (!token || !newPassword) {
       throw new BadRequestException('Token and new password are required.');
@@ -197,6 +219,28 @@ export class AuthService {
     // Find the user by plaintext token + tenant
     const user = await this.userRepository.findOne({
       where: { reset_password_token: token, tenant_id: resolvedTenantId },
+    });
+
+    if (!user || !user.reset_password_expires || user.reset_password_expires < new Date()) {
+      throw new BadRequestException('Invalid or expired reset token.');
+    }
+
+    user.password_hash = await bcrypt.hash(newPassword, 10);
+    user.reset_password_token = null;
+    user.reset_password_expires = null;
+    await this.userRepository.save(user);
+
+    return { message: 'Password has been reset successfully.' };
+  }
+
+  async resetSuperadminPassword(token: string, newPassword: string) {
+    if (!token || !newPassword) {
+      throw new BadRequestException('Token and new password are required.');
+    }
+
+    // Find superadmin by plaintext token (no tenant_id filter)
+    const user = await this.userRepository.findOne({
+      where: { reset_password_token: token },
     });
 
     if (!user || !user.reset_password_expires || user.reset_password_expires < new Date()) {

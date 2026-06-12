@@ -41,8 +41,8 @@ export class AuthController {
     @Body('email') email: string,
     @Req() req: express.Request,
   ) {
-    // Superadmin has no school_code, pass undefined
-    return this.authService.requestPasswordReset(email, '', undefined);
+    // Superadmin has no tenant context — use dedicated method
+    return this.authService.requestSuperadminPasswordReset(email);
   }
 
   @Post('reset-password')
@@ -54,6 +54,16 @@ export class AuthController {
   ) {
     const tenantId = req['tenantId'] as string;
     return this.authService.resetPassword(token, newPassword, tenantId, schoolCode);
+  }
+
+  @Post('reset-password/superadmin')
+  async resetPasswordSuperAdmin(
+    @Body('token') token: string,
+    @Body('newPassword') newPassword: string,
+    @Req() req: express.Request,
+  ) {
+    // Superadmin password reset — no tenant context
+    return this.authService.resetSuperadminPassword(token, newPassword);
   }
 
   @UseGuards(JwtAuthGuard)
