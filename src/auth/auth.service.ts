@@ -53,7 +53,7 @@ export class AuthService {
 
     // Hash password
     const password_hash = await bcrypt.hash(password, 10);
-    // Save user
+    // Save Scholro user
     const user = this.userRepository.create({
       name,
       email,
