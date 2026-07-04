@@ -13,6 +13,9 @@ import { UserRole } from '../users/user-role.entity';
 import { Role } from '../users/role.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { Tenant } from '../super-admin/tenant.entity';
+import { Class } from '../classes/class.entity';
+import { Section } from '../sections/section.entity';
+import { Lead, LeadStatus } from '../leads/lead.entity';
 import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
 
@@ -37,45 +40,133 @@ export class StudentsService {
     private readonly dataSource: DataSource,
   ) {}
 
+  private normalizeName(value: string): string {
+    return value.trim().toLowerCase().replace(/\s+/g, '');
+  }
+
   async createStudent(
     createStudentDto: CreateStudentDto,
     tenantId: string,
   ): Promise<Student> {
-    const { class_id, academic_year_id, section_id, ...studentFields } = createStudentDto;
+    const {
+      class_id,
+      class_name,
+      academic_year_id,
+      section_id,
+      section_name,
+      lead_id,
+      ...studentFields
+    } = createStudentDto;
 
-    if (class_id && academic_year_id) {
-      // Capture narrowed values so TypeScript doesn't lose the type inside the async callback
-      const resolvedClassId = class_id;
-      const resolvedYearId = academic_year_id;
-      const resolvedSectionId = section_id ?? null;
+    const normalizedClassName = class_name?.trim();
+    const normalizedSectionName = section_name?.trim();
 
-      return this.dataSource.transaction(async (manager) => {
-        const student = manager.create(Student, {
-          ...studentFields,
-          tenant_id: tenantId,
+    if (lead_id && !academic_year_id) {
+      throw new BadRequestException(
+        'academic_year_id is required when registering a student from an inquiry',
+      );
+    }
+
+    if (lead_id && !class_id && !normalizedClassName) {
+      throw new BadRequestException(
+        'class_id or class_name is required when registering a student from an inquiry',
+      );
+    }
+
+    if (section_id && !class_id && !normalizedClassName) {
+      throw new BadRequestException('class_id is required when section is provided');
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      let resolvedClassId = class_id;
+      let resolvedSectionId = section_id ?? null;
+
+      if (!resolvedClassId && normalizedClassName) {
+        const allClasses = await manager.find(Class, {
+          where: { tenant_id: tenantId },
         });
-        const saved = await manager.save(Student, student);
+        const matchedClass = allClasses.find(
+          (klass) =>
+            this.normalizeName(klass.name) ===
+            this.normalizeName(normalizedClassName),
+        );
 
+        if (matchedClass) {
+          resolvedClassId = matchedClass.id;
+        } else {
+          const newClass = manager.create(Class, {
+            tenant_id: tenantId,
+            name: normalizedClassName,
+          });
+          const savedClass = await manager.save(Class, newClass);
+          resolvedClassId = savedClass.id;
+        }
+      }
+
+      if (resolvedClassId && !academic_year_id) {
+        throw new BadRequestException(
+          'academic_year_id is required when class enrollment is provided',
+        );
+      }
+
+      if (!resolvedSectionId && resolvedClassId && normalizedSectionName) {
+        const allSections = await manager.find(Section, {
+          where: { tenant_id: tenantId, class_id: resolvedClassId },
+        });
+        const matchedSection = allSections.find(
+          (section) =>
+            this.normalizeName(section.name) ===
+            this.normalizeName(normalizedSectionName),
+        );
+
+        if (matchedSection) {
+          resolvedSectionId = matchedSection.id;
+        } else {
+          const newSection = manager.create(Section, {
+            tenant_id: tenantId,
+            class_id: resolvedClassId,
+            name: normalizedSectionName,
+          });
+          const savedSection = await manager.save(Section, newSection);
+          resolvedSectionId = savedSection.id;
+        }
+      }
+
+      const student = manager.create(Student, {
+        ...studentFields,
+        tenant_id: tenantId,
+      });
+      const savedStudent = await manager.save(Student, student);
+
+      if (resolvedClassId && academic_year_id) {
         const enrollment = manager.create(Enrollment, {
-          student_id: saved.id,
+          student_id: savedStudent.id,
           class_id: resolvedClassId,
-          academic_year_id: resolvedYearId,
+          academic_year_id,
           section_id: resolvedSectionId,
           roll_number: '',
           status: 'active',
           tenant_id: tenantId,
         });
         await manager.save(Enrollment, enrollment);
+      }
 
-        return saved;
-      });
-    }
+      if (lead_id) {
+        const lead = await manager.findOne(Lead, {
+          where: { id: lead_id, tenant_id: tenantId },
+        });
+        if (!lead) {
+          throw new BadRequestException('Lead not found for this tenant');
+        }
+        lead.status = LeadStatus.ENROLLED;
+        await manager.save(Lead, {
+          ...lead,
+          tenant_id: tenantId,
+        });
+      }
 
-    const student = this.studentRepository.create({
-      ...studentFields,
-      tenant_id: tenantId,
+      return savedStudent;
     });
-    return this.studentRepository.save(student);
   }
 
   async getAllStudents(tenantId: string) {

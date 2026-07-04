@@ -36,4 +36,16 @@ export class CreateStudentDto {
   @IsOptional()
   @IsUUID()
   section_id?: string;
+
+  @IsOptional()
+  @IsString()
+  class_name?: string;
+
+  @IsOptional()
+  @IsString()
+  section_name?: string;
+
+  @IsOptional()
+  @IsUUID()
+  lead_id?: string;
 }
