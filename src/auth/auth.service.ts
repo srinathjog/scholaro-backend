@@ -53,7 +53,7 @@ export class AuthService {
 
     // Hash password
     const password_hash = await bcrypt.hash(password, 10);
-    // Save Scholro user
+    // Save Scholaro user
     const user = this.userRepository.create({
       name,
       email,
@@ -200,37 +200,61 @@ export class AuthService {
   }
 
   async resetPassword(token: string, newPassword: string, tenantId: string, schoolCode?: string) {
-    if (!token || !newPassword) {
-      throw new BadRequestException('Token and new password are required.');
-    }
+    try {
+      if (!token || !newPassword) {
+        throw new BadRequestException('Token and new password are required.');
+      }
 
-    // Resolve school_code to tenant UUID if provided
-    let resolvedTenantId = tenantId;
-    if (schoolCode) {
-      const tenant = await this.tenantRepository.findOne({
-        where: { tenant_code: schoolCode.toUpperCase() },
-      });
-      if (!tenant) {
+      // Resolve school_code to tenant UUID if provided
+      let resolvedTenantId = tenantId;
+      if (schoolCode) {
+        const tenant = await this.tenantRepository.findOne({
+          where: { tenant_code: schoolCode.toUpperCase() },
+        });
+        if (!tenant) {
+          throw new BadRequestException('Invalid or expired reset token.');
+        }
+        resolvedTenantId = tenant.id;
+      }
+
+      let user: User | null = null;
+      if (resolvedTenantId) {
+        user = await this.userRepository.findOne({
+          where: { reset_password_token: token, tenant_id: resolvedTenantId },
+        });
+      } else {
+        user = await this.userRepository.findOne({
+          where: { reset_password_token: token },
+        });
+      }
+
+      if (!user || !user.reset_password_expires || user.reset_password_expires < new Date()) {
         throw new BadRequestException('Invalid or expired reset token.');
       }
-      resolvedTenantId = tenant.id;
+
+      if (!resolvedTenantId) {
+        const userRoles = await this.userRoleRepository.find({
+          where: { user_id: user.id },
+          relations: ['role'],
+        });
+        const roleNames = userRoles.map((ur) => ur.role?.name).filter(Boolean);
+        if (!roleNames.includes('SUPER_ADMIN')) {
+          throw new BadRequestException('Invalid or expired reset token.');
+        }
+      }
+
+      user.password_hash = await bcrypt.hash(newPassword, 10);
+      user.reset_password_token = null;
+      user.reset_password_expires = null;
+      await this.userRepository.save(user);
+
+      return { message: 'Password has been reset successfully.' };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Unable to reset password at this time. Please try again.');
     }
-
-    // Find the user by plaintext token + tenant
-    const user = await this.userRepository.findOne({
-      where: { reset_password_token: token, tenant_id: resolvedTenantId },
-    });
-
-    if (!user || !user.reset_password_expires || user.reset_password_expires < new Date()) {
-      throw new BadRequestException('Invalid or expired reset token.');
-    }
-
-    user.password_hash = await bcrypt.hash(newPassword, 10);
-    user.reset_password_token = null;
-    user.reset_password_expires = null;
-    await this.userRepository.save(user);
-
-    return { message: 'Password has been reset successfully.' };
   }
 
   async resetSuperadminPassword(token: string, newPassword: string) {

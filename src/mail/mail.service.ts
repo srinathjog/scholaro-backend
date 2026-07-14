@@ -8,7 +8,7 @@ import { join } from 'path';
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private readonly resend: Resend;
+  private resend: Resend | null = null;
   private readonly from: string;
   private readonly templateCache = new Map<string, Handlebars.TemplateDelegate>();
 
@@ -20,10 +20,21 @@ export class MailService {
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('RESEND_API_KEY')
       || this.configService.get<string>('MAIL_PASSWORD') || '';
-    this.resend = new Resend(apiKey);
+    if (apiKey) {
+      this.resend = new Resend(apiKey);
+    } else {
+      this.logger.warn('RESEND_API_KEY or MAIL_PASSWORD missing; email sending will be disabled locally.');
+    }
     this.from = this.configService.get<string>('MAIL_FROM')
       || this.configService.get<string>('SMTP_FROM')
       || 'Scholaro <noreply@scholaro.app>';
+  }
+
+  private getResendClient(): Resend {
+    if (!this.resend) {
+      throw new Error('Email service is not configured for this environment.');
+    }
+    return this.resend;
   }
 
   private renderTemplate(name: string, context: Record<string, any>): string {
@@ -51,7 +62,7 @@ export class MailService {
   private async send(to: string, subject: string, html: string): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       this.sendQueue.push(async () => {
-        const { error } = await this.resend.emails.send({
+        const { error } = await this.getResendClient().emails.send({
           from: this.from,
           to,
           subject,

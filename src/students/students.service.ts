@@ -132,11 +132,20 @@ export class StudentsService {
         }
       }
 
+      console.log('Starting student creation transaction for lead conversion', {
+        lead_id,
+        class_id,
+        class_name: normalizedClassName,
+        section_id,
+        section_name: normalizedSectionName,
+      });
+
       const student = manager.create(Student, {
         ...studentFields,
         tenant_id: tenantId,
       });
       const savedStudent = await manager.save(Student, student);
+      console.log('Created student record', { student_id: savedStudent.id });
 
       if (resolvedClassId && academic_year_id) {
         const enrollment = manager.create(Enrollment, {
@@ -149,6 +158,12 @@ export class StudentsService {
           tenant_id: tenantId,
         });
         await manager.save(Enrollment, enrollment);
+        console.log('Created enrollment record', {
+          student_id: savedStudent.id,
+          class_id: resolvedClassId,
+          section_id: resolvedSectionId,
+          academic_year_id,
+        });
       }
 
       if (lead_id) {
@@ -158,11 +173,78 @@ export class StudentsService {
         if (!lead) {
           throw new BadRequestException('Lead not found for this tenant');
         }
+
         lead.status = LeadStatus.ENROLLED;
         await manager.save(Lead, {
           ...lead,
           tenant_id: tenantId,
         });
+        console.log('Updated lead status to ENROLLED', { lead_id });
+
+        if (lead.parent_email?.trim()) {
+          const parentEmail = lead.parent_email.trim().toLowerCase();
+          let parentUser = await manager.findOne(User, {
+            where: { email: parentEmail, tenant_id: tenantId },
+          });
+
+          let createdParentUser = false;
+          if (!parentUser) {
+            const defaultPassword = 'Welcome@Scholaro2026';
+            parentUser = manager.create(User, {
+              name: lead.parent_name?.trim() || parentEmail,
+              email: parentEmail,
+              password_hash: await bcrypt.hash(defaultPassword, 10),
+              tenant_id: tenantId,
+            });
+            parentUser = await manager.save(User, parentUser);
+            createdParentUser = true;
+            console.log('Created parent user from lead email', {
+              parent_user_id: parentUser.id,
+              email: parentEmail,
+            });
+
+            let parentRole = await manager.findOne(Role, {
+              where: { name: 'PARENT' },
+            });
+            if (!parentRole) {
+              parentRole = manager.create(Role, { name: 'PARENT' });
+              parentRole = await manager.save(Role, parentRole);
+            }
+            const userRole = manager.create(UserRole, {
+              tenant_id: tenantId,
+              user_id: parentUser.id,
+              role_id: parentRole.id,
+            });
+            await manager.save(UserRole, userRole);
+            console.log('Assigned PARENT role to user', { parent_user_id: parentUser.id });
+          }
+
+          const existingLink = await manager.findOne(ParentStudent, {
+            where: {
+              parent_user_id: parentUser.id,
+              student_id: savedStudent.id,
+              tenant_id: tenantId,
+            },
+          });
+          if (!existingLink) {
+            const link = manager.create(ParentStudent, {
+              tenant_id: tenantId,
+              parent_user_id: parentUser.id,
+              student_id: savedStudent.id,
+              relationship: 'parent',
+            });
+            await manager.save(ParentStudent, link);
+            console.log('Linked parent user to student', {
+              parent_user_id: parentUser.id,
+              student_id: savedStudent.id,
+            });
+          } else {
+            console.log('Parent user already linked to student', {
+              parent_user_id: parentUser.id,
+              student_id: savedStudent.id,
+            });
+          }
+        }
       }
 
       return savedStudent;

@@ -5,13 +5,25 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 @Injectable()
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
-  private readonly supabase: SupabaseClient;
+  private supabase: SupabaseClient | null = null;
   private readonly bucket = 'activity-media';
 
   constructor(private readonly configService: ConfigService) {
-    const url = this.configService.get<string>('SUPABASE_URL')!;
-    const key = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY')!;
-    this.supabase = createClient(url, key);
+    const url = this.configService.get<string>('SUPABASE_URL');
+    const key = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (url && key) {
+      this.supabase = createClient(url, key);
+    } else {
+      this.logger.warn('SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing; storage features will be disabled locally.');
+    }
+  }
+
+  private getSupabaseClient(): SupabaseClient {
+    if (!this.supabase) {
+      throw new Error('Supabase storage is not configured for this environment.');
+    }
+    return this.supabase;
   }
 
   /**
@@ -25,8 +37,9 @@ export class StorageService {
   ): Promise<{ signedUrl: string; path: string; publicUrl: string }> {
     const ext = contentType.includes('video') ? 'mp4' : 'jpg';
     const path = `${tenantId}/activity_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+    const supabase = this.getSupabaseClient();
 
-    const { data, error } = await this.supabase.storage
+    const { data, error } = await supabase.storage
       .from(this.bucket)
       .createSignedUploadUrl(path);
 
@@ -35,7 +48,7 @@ export class StorageService {
       throw new Error(`Could not generate upload URL: ${error?.message}`);
     }
 
-    const { data: publicData } = this.supabase.storage
+    const { data: publicData } = supabase.storage
       .from(this.bucket)
       .getPublicUrl(path);
 
@@ -54,10 +67,11 @@ export class StorageService {
     tenantId: string,
   ): Promise<string> {
     const docBucket = 'school-documents';
+    const supabase = this.getSupabaseClient();
 
     // Ensure the bucket exists — idempotent, safe to call on every upload.
     // We silently ignore "already exists" errors.
-    const { error: bucketError } = await this.supabase.storage.createBucket(docBucket, {
+    const { error: bucketError } = await supabase.storage.createBucket(docBucket, {
       public: true,
       allowedMimeTypes: null as any, // no MIME restrictions
     });
@@ -69,7 +83,7 @@ export class StorageService {
     const ext = filename.includes('.') ? filename.split('.').pop() : 'pdf';
     const path = `${tenantId}/${uniqueName}.${ext}`;
 
-    const { error } = await this.supabase.storage
+    const { error } = await supabase.storage
       .from(docBucket)
       .upload(path, buffer, { contentType, upsert: false, cacheControl: '3600' });
 
@@ -78,7 +92,7 @@ export class StorageService {
       throw new Error(`Upload failed: ${error.message}`);
     }
 
-    const { data } = this.supabase.storage.from(docBucket).getPublicUrl(path);
+    const { data } = supabase.storage.from(docBucket).getPublicUrl(path);
     return data.publicUrl;
   }
 
@@ -96,8 +110,9 @@ export class StorageService {
     const ext = filename.includes('.') ? filename.split('.').pop() : 'jpg';
     const path = `${tenantId}/${uniqueName}.${ext}`;
     console.log('Uploading file as:', path);
+    const supabase = this.getSupabaseClient();
 
-    const { error } = await this.supabase.storage
+    const { error } = await supabase.storage
       .from(this.bucket)
       .upload(path, buffer, {
         contentType,
@@ -110,7 +125,7 @@ export class StorageService {
       throw new Error(`Upload failed: ${error.message}`);
     }
 
-    const { data } = this.supabase.storage
+    const { data } = supabase.storage
       .from(this.bucket)
       .getPublicUrl(path);
 
