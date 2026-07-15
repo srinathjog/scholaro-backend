@@ -194,7 +194,7 @@ export class AuthService {
     await this.userRepository.save(user);
 
     // Fire-and-forget — don't block request on email delivery
-    this.mailService.sendResetPasswordEmail(email, token, 'Scholaro Platform');
+    this.mailService.sendResetPasswordEmail(email, token, 'Scholaro Platform', true);
 
     return { message: 'If that email exists, a reset link has been sent.' };
   }

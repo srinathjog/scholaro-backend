@@ -140,10 +140,11 @@ export class MailService {
     email: string,
     token: string,
     schoolName: string,
+    isSuperAdmin = false,
   ): Promise<void> {
     const frontendUrl =
       this.configService.get<string>('FRONTEND_URL') || 'https://scholaro.app';
-    const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
+    const resetUrl = `${frontendUrl}/reset-password?token=${token}${isSuperAdmin ? '&super=1' : ''}`;
 
     const subject = `Password Reset — ${schoolName}`;
 
