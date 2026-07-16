@@ -60,6 +60,11 @@ export class MailService {
   }
 
   private async send(to: string, subject: string, html: string): Promise<void> {
+    if (!this.resend) {
+      this.logger.warn(`Mail sending skipped because no provider is configured. To: ${to}; Subject: ${subject}`);
+      return;
+    }
+
     return new Promise<void>((resolve, reject) => {
       this.sendQueue.push(async () => {
         const { error } = await this.getResendClient().emails.send({
@@ -94,8 +99,8 @@ export class MailService {
     tempPassword: string,
     schoolCode?: string,
   ): Promise<void> {
-    const loginUrl =
-      this.configService.get<string>('FRONTEND_URL') || 'https://scholaro.app';
+    const loginUrl = this.configService.get<string>('FRONTEND_URL')
+      || (this.configService.get<string>('NODE_ENV') === 'production' ? 'https://scholaro.app' : 'http://localhost:4200');
 
     const subject = `${studentName}'s school ${schoolName} is now on Scholaro! 🎉`;
 
@@ -118,8 +123,8 @@ export class MailService {
     schoolCode: string,
     tempPassword: string,
   ): Promise<void> {
-    const loginUrl =
-      this.configService.get<string>('FRONTEND_URL') || 'https://scholaro.app';
+    const loginUrl = this.configService.get<string>('FRONTEND_URL')
+      || (this.configService.get<string>('NODE_ENV') === 'production' ? 'https://scholaro.app' : 'http://localhost:4200');
 
     const subject = roleName === 'School Admin'
       ? `Your School ${schoolName} is now live on Scholaro! 🚀`
@@ -142,11 +147,16 @@ export class MailService {
     schoolName: string,
     isSuperAdmin = false,
   ): Promise<void> {
-    const frontendUrl =
-      this.configService.get<string>('FRONTEND_URL') || 'https://scholaro.app';
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL')
+      || (this.configService.get<string>('NODE_ENV') === 'production' ? 'https://scholaro.app' : 'http://localhost:4200');
     const resetUrl = `${frontendUrl}/reset-password?token=${token}${isSuperAdmin ? '&super=1' : ''}`;
 
     const subject = `Password Reset — ${schoolName}`;
+
+    if (!this.resend) {
+      this.logger.warn(`Mail provider not configured. Reset link for ${email}: ${resetUrl}`);
+      return;
+    }
 
     try {
       const html = this.renderTemplate('reset-password', { email, token, resetUrl, schoolName });
